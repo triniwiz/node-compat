@@ -4,7 +4,10 @@
   "license": "SEE LICENSE IN <your-license-filename>",
   "repository": "<fill-your-repository-here>",
   "dependencies": {
-    "@nativescript/core": "file:../../node_modules/@nativescript/core"
+    "@nativescript/core": "file:../../node_modules/@nativescript/core",
+    "@nativescript/node-core": "file:../../packages/node-core",
+    "@nativescript/node-fs": "file:../../packages/node-fs",
+    "@nativescript/node-buffer": "file:../../packages/node-buffer"
   },
   "devDependencies": {
     "@nativescript/android": "~8.4.0",

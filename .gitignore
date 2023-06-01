@@ -42,3 +42,9 @@ Thumbs.db
 
 *.tgz
 packages/**/angular/dist
+
+
+/target
+/**/*.rs.bk
+/Cargo.lock
+.DS_Store

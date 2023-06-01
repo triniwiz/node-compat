@@ -6,6 +6,9 @@
     <ScrollView class="h-full">
       <StackLayout>
         <Button text="add a package first" tap="{{ viewDemo }}" class="btn btn-primary view-demo"/>
+<Button text="node-core" tap="{{ viewDemo }}" class="btn btn-primary view-demo"/>
+<Button text="node-fs" tap="{{ viewDemo }}" class="btn btn-primary view-demo"/>
+<Button text="node-buffer" tap="{{ viewDemo }}" class="btn btn-primary view-demo"/>
       </StackLayout>
     </ScrollView>
   </StackLayout>

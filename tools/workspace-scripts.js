@@ -61,6 +61,27 @@ module.exports = {
     // packages
     // build output is always in dist/packages
     '@nativescript': {
+      // @nativescript/node-core
+      'node-core': {
+        build: {
+          script: 'nx run node-core:build.all',
+          description: '@nativescript/node-core: Build',
+        },
+      },
+      // @nativescript/node-fs
+      'node-fs': {
+        build: {
+          script: 'nx run node-fs:build.all',
+          description: '@nativescript/node-fs: Build',
+        },
+      },
+      // @nativescript/node-buffer
+      'node-buffer': {
+        build: {
+          script: 'nx run node-buffer:build.all',
+          description: '@nativescript/node-buffer: Build',
+        },
+      },
       'build-all': {
         script: 'nx run-many --target=build.all --all',
         description: 'Build all packages',
@@ -71,6 +92,18 @@ module.exports = {
       description: '_____________  Focus (VS Code supported)  _____________',
     },
     focus: {
+      'node-core': {
+        script: 'nx run node-core:focus',
+        description: 'Focus on @nativescript/node-core',
+      },
+      'node-fs': {
+        script: 'nx run node-fs:focus',
+        description: 'Focus on @nativescript/node-fs',
+      },
+      'node-buffer': {
+        script: 'nx run node-buffer:focus',
+        description: 'Focus on @nativescript/node-buffer',
+      },
       reset: {
         script: 'nx g @nativescript/plugin-tools:focus-packages',
         description: 'Reset Focus',

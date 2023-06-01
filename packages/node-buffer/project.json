@@ -1,0 +1,65 @@
+{
+  "name": "node-buffer",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "packages/node-buffer",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/js:tsc",
+      "options": {
+        "outputPath": "dist/packages/node-buffer",
+        "tsConfig": "packages/node-buffer/tsconfig.json",
+        "packageJson": "packages/node-buffer/package.json",
+        "main": "packages/node-buffer/index.d.ts",
+        "assets": [
+          "packages/node-buffer/*.md",
+          "packages/node-buffer/index.d.ts",
+          "LICENSE",
+          {
+            "glob": "**/*",
+            "input": "packages/node-buffer/platforms/",
+            "output": "./platforms/"
+          }
+        ],
+        "dependsOn": [
+          {
+            "target": "build.all",
+            "projects": "dependencies"
+          }
+        ]
+      }
+    },
+    "build.all": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["node tools/scripts/build-finish.ts node-buffer"],
+        "parallel": false
+      },
+      "outputs": ["dist/packages/node-buffer"],
+      "dependsOn": [
+        {
+          "target": "build.all",
+          "projects": "dependencies"
+        },
+        {
+          "target": "build",
+          "projects": "self"
+        }
+      ]
+    },
+    "focus": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["nx g @nativescript/plugin-tools:focus-packages node-buffer"],
+        "parallel": false
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "options": {
+        "lintFilePatterns": ["packages/node-buffer/**/*.ts"]
+      }
+    }
+  },
+  "tags": []
+}
