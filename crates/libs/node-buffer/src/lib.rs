@@ -47,8 +47,16 @@ impl BufferBuilder {
                         string.as_bytes().to_vec()
                     }
                     StringEncoding::Utf16le => {
-                        let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
-                        decoded.as_bytes().to_vec()
+                       string
+                           .to_string_lossy()
+                           .to_string()
+                           .encode_utf16()
+                           .flat_map(|c|{
+                               let mut bytes = [0; 2];
+                               LittleEndian::write_u16(&mut bytes, c);
+                               bytes.to_vec()
+                           })
+                           .collect::<Vec<u8>>()
                     }
                     StringEncoding::Ucs2 => {
                         let string = string.as_bytes();
