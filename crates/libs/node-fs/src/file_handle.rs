@@ -9,14 +9,12 @@ use crate::a_sync::{runtime, AsyncClosure};
 use crate::file_stat::FileStat;
 use crate::sync::open_handle_with_path_str;
 
-pub struct FileHandle {
-    pub(crate) file: File,
-}
+pub struct FileHandle(File);
 
 #[allow(non_snake_case)]
 impl FileHandle {
     pub fn new(file: File) -> Self {
-        Self { file }
+        Self (file)
     }
 
     pub fn new_async(
