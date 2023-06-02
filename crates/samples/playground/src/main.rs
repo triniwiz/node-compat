@@ -3,13 +3,18 @@ use node_buffer::{Buffer, StringEncoding};
 
 fn main() {
     let mut buffer = Buffer::builder()
-        .size(12)
+        .fill_text(CString::new("hello world").unwrap(), StringEncoding::Utf8)
         .build();
 
-    buffer.fill(CString::new("Hello World").unwrap(), None);
+    println!("{}", buffer.to_string(Some(StringEncoding::Hex), None, None));
+// Prints: 68656c6c6f20776f726c64
+    println!("{}", buffer.to_string(Some(StringEncoding::Base64), None, None));
+// Prints: aGVsbG8gd29ybGQ=
 
-
-    println!("hello data {}", buffer);
+    println!("{}", Buffer::builder().fill_text(CString::new("fhqwhgads").unwrap(), StringEncoding::Utf8).build());
+// Prints: <Buffer 66 68 71 77 68 67 61 64 73>
+    println!("{}", Buffer::builder().fill_text(CString::new("fhqwhgads").unwrap(), StringEncoding::Utf16le).build());
+// Prints: <Buffer 66 00 68 00 71 00 77 00 68 00 67 00 61 00 64 00 73 00>
 
 
     let buffer1: &[u8] = &[1, 2, 3];
@@ -19,8 +24,7 @@ fn main() {
 
     let buffer = Buffer::concat(&[buffer1, buffer2, buffer3], None);
 
-    println!("concat data {}", buffer);
-
+    println!("data {}", buffer);
 
     let buffer = Buffer::builder()
         .size(11)
@@ -28,7 +32,6 @@ fn main() {
         .build();
 
     println!("{}", buffer);
-
 
     let mut buffer = Buffer::builder()
         .size(26)
@@ -110,7 +113,7 @@ fn main() {
 
     buffer.write_int16be(0x0102, None);
 
-    println!("{}",buffer);
+    println!("{}", buffer);
 // Prints: <Buffer 01 02>
 
 
