@@ -120,8 +120,8 @@ fn set_handler(builder: &mut tokio::runtime::Builder) {
     });
 }
 
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn set_handler(_builder: &mut tokio::runtime::Builder) {}
+fn set_handler(_builder: &mut tokio::runtime::Builder){}
+
 
 #[allow(dead_code)]
 pub(crate) struct WatcherItem {
