@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "crates/libs/*"
+    "crates/libs/*",
+    "crates/samples/*"
 ]
