@@ -9,7 +9,7 @@ fn main() {
     buffer.fill(CString::new("Hello World").unwrap(), None);
 
 
-    println!("data {:?}", buffer.buffer());
+    println!("hello data {}", buffer);
 
 
     let buffer1: &[u8] = &[1, 2, 3];
@@ -17,9 +17,9 @@ fn main() {
     let buffer3: &[u8] = &[7, 8, 9];
 
 
-    let buffer = Buffer::concat(&[buffer1, buffer2, buffer3], Some(0));
+    let buffer = Buffer::concat(&[buffer1, buffer2, buffer3], None);
 
-    println!("data {:?}", buffer.buffer());
+    println!("concat data {}", buffer);
 
 
     let buffer = Buffer::builder()
@@ -27,7 +27,7 @@ fn main() {
         .fill_text(CString::new("aGVsbG8gd29ybGQ=").unwrap(), StringEncoding::Base64)
         .build();
 
-    println!("{:?}", buffer.buffer());
+    println!("{}", buffer);
 
 
     let mut buffer = Buffer::builder()
@@ -61,7 +61,7 @@ fn main() {
 
     buffer.write_big_int64be(0x0102030405060708, Some(0));
 
-    println!("{:?}", buffer.buffer());
+    println!("{:}", buffer);
 
 
     let mut buffer = Buffer::builder()
@@ -70,7 +70,7 @@ fn main() {
 
     buffer.write_big_int64le(0x0102030405060708, Some(0));
 
-    println!("{:?}", buffer.buffer());
+    println!("{}", buffer);
 
 
     let mut buffer = Buffer::builder()
@@ -79,7 +79,7 @@ fn main() {
 
     buffer.write_big_uint64be(0xdecafafecacefade, Some(0));
 
-    println!("{:?}", buffer);
+    println!("{}", buffer);
 
 
     let mut buffer = Buffer::builder()
@@ -88,7 +88,7 @@ fn main() {
 
     buffer.write_big_uint64le(0xdecafafecacefade, Some(0));
 
-    println!("{:?}", buffer);
+    println!("{}", buffer);
 
 
     let mut buffer = Buffer::builder()
@@ -100,16 +100,25 @@ fn main() {
     buffer.write_uint8(0x23, Some(2));
     buffer.write_uint8(0x42, Some(3));
 
-    println!("{:?}", buffer);
+    println!("{}", buffer);
 // Prints: <Buffer 03 04 23 42>
+
+
+    let mut buffer = Buffer::builder()
+        .size(2)
+        .build();
+
+    buffer.write_int16be(0x0102, None);
+
+    println!("{}",buffer);
+// Prints: <Buffer 01 02>
 
 
     let mut buffer = Buffer::builder()
         .size(4)
         .build();
-
-   // buffer.write_int16be(0xdead, Some(0));
-   // buffer.write_int16be(0xbeef, Some(2));
+    buffer.write_uint16be(0xdead, Some(0));
+    buffer.write_uint16be(0xbeef, Some(2));
 
     println!("{}", buffer);
 // Prints: <Buffer de ad be ef>

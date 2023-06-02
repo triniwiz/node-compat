@@ -1,5 +1,5 @@
 use std::ffi::{c_void, CString};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display, format, Formatter};
 use std::io::Write;
 use std::str::Utf8Error;
 use std::sync::{Arc};
@@ -145,15 +145,16 @@ impl Default for Buffer {
     }
 }
 
-impl Debug for Buffer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<Buffer {}>", self.to_string(Some(StringEncoding::Hex), None, None))
-    }
-}
-
 impl Display for Buffer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<Buffer {}>", self.to_string(Some(StringEncoding::Hex), None, None))
+        let ret = self.to_string(Some(StringEncoding::Hex), None, None).chars()
+            .collect::<Vec<char>>()
+            .chunks(2)
+            .map(|chunk| chunk.iter().collect::<String>())
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        write!(f, "<Buffer {}>", ret)
     }
 }
 
@@ -411,7 +412,7 @@ impl Buffer {
             None => buffers.iter().map(|buf| buf.len()).sum(),
         };
 
-        let mut result = Vec::with_capacity(len);
+        let mut result = vec![0_u8; len];
 
         let mut cursor = std::io::Cursor::new(&mut result);
 
@@ -428,6 +429,7 @@ impl Buffer {
             let bytes_to_write = remaining_length.min(buf.len());
             cursor.write_all(&buf[..bytes_to_write]).unwrap();
         }
+
         Buffer(BufferInner::Allocated(
             Arc::new(
                 RwLock::new(
