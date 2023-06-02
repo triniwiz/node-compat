@@ -598,27 +598,36 @@ pub fn rmdir(
                 if max_retries != 0 {
                     let current = max_retries_count.load(Ordering::SeqCst);
                     if current == 0 {
-                        return backoff::Error::permanent(e);
+                        return Error::permanent(e);
                     }
                     *max_retries_count.get_mut() = current - 1;
                 }
-                match e.kind() {
-                    std::io::ErrorKind::ResourceBusy
-                    | std::io::ErrorKind::FilesystemLoop
-                    | std::io::ErrorKind::DirectoryNotEmpty => Error::Transient {
-                        err: e,
-                        retry_after: Some(Duration::from_millis(retry_delay)),
-                    },
-                    _ => {
+                return match e {
+                    Error::Transient { err, .. } => {
                         let val = e.to_string().to_lowercase();
+
                         if val.contains("too many open files") {
-                            Error::Transient {
-                                err: e,
+                            return Error::Transient {
+                                err,
                                 retry_after: Some(Duration::from_millis(retry_delay)),
                             }
-                        } else {
-                            Error::Permanent(e)
                         }
+
+
+                        Error::Transient {
+                            err,
+                            retry_after: Some(Duration::from_millis(retry_delay)),
+                        }
+                    },
+                    Error::Permanent(err) => {
+                        if val.contains("too many open files") {
+                            return Error::Transient {
+                                err,
+                                retry_after: Some(Duration::from_millis(retry_delay)),
+                            }
+                        }
+
+                        Error::permanent(err)
                     }
                 }
             })
@@ -651,23 +660,32 @@ pub fn rm(
                     *max_retries_count.get_mut() = current - 1;
                 }
 
-                match e.kind() {
-                    std::io::ErrorKind::ResourceBusy
-                    | std::io::ErrorKind::FilesystemLoop
-                    | std::io::ErrorKind::DirectoryNotEmpty => Error::Transient {
-                        err: e,
-                        retry_after: Some(Duration::from_millis(retry_delay)),
-                    },
-                    _ => {
+                return match e {
+                    Error::Transient { err, .. } => {
                         let val = e.to_string().to_lowercase();
+
                         if val.contains("too many open files") {
-                            Error::Transient {
-                                err: e,
+                            return Error::Transient {
+                                err,
                                 retry_after: Some(Duration::from_millis(retry_delay)),
                             }
-                        } else {
-                            Error::Permanent(e)
                         }
+
+
+                        Error::Transient {
+                            err,
+                            retry_after: Some(Duration::from_millis(retry_delay)),
+                        }
+                    },
+                    Error::Permanent(err) => {
+                        if val.contains("too many open files") {
+                            return Error::Transient {
+                                err,
+                                retry_after: Some(Duration::from_millis(retry_delay)),
+                            }
+                        }
+
+                        Error::permanent(err)
                     }
                 }
             })
