@@ -7,11 +7,14 @@ use base64::Engine;
 use parking_lot::RwLock;
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 
+#[derive(Clone)]
 enum BufferInner {
     Empty,
     Allocated(Arc<RwLock<Vec<u8>>>),
     Reference(Arc<RwLock<(*mut u8, usize)>>),
 }
+
+unsafe impl Send for BufferInner {}
 
 #[repr(C)]
 pub enum StringEncoding {
@@ -144,6 +147,7 @@ impl BufferBuilder {
     }
 }
 
+#[derive(Clone)]
 #[repr(C)]
 pub struct Buffer(BufferInner);
 
@@ -646,3 +650,5 @@ impl Buffer {
         }
     }
 }
+
+unsafe impl Send for Buffer {}

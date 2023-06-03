@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-node-buffer = {path = "../node-buffer"}
+node-core = { path = "../node-core" }
+node-buffer = { path = "../node-buffer" }
 parking_lot = "0.12.0"
 once_cell = "1.8.0"
 filetime = "0.2"
@@ -13,7 +14,7 @@ faccess = { git = "https://github.com/MightyPork/faccess", rev = "0c94ef6d4b08a6
 notify = "6.0.0"
 backoff = { git = "https://github.com/ihrwein/backoff", rev = "08f4e2111ea4b856b24556555d5c6ecf14cfa69d" }
 num_cpus = "1.15.0"
-tokio = { version = "1.28.2", features = ["rt-multi-thread"] }
+tokio = { version = "1.28.2", features = ["full"] }
 log = "0.4.18"
 rand = "0.8.5"
 

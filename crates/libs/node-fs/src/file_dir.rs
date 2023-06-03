@@ -29,7 +29,7 @@ impl Drop for FileDir {
     fn drop(&mut self) {
         // todo drop dir
         unsafe {
-            let _ = CString::from_raw(self.path);
+         //   let _ = CString::from_raw(self.);
         }
     }
 }
@@ -41,7 +41,7 @@ impl FileDir {
 
     pub fn close(&self) -> std::io::Result<()> {
         let dir = self.0.0.read();
-        let ret = unsafe { libc::closedir(dir.1 as _) };
+        let ret = unsafe { libc::closedir(dir.1.as_ptr() as _) };
 
         if ret == -1 {
             let last_error = std::io::Error::last_os_error();
@@ -68,7 +68,9 @@ impl FileDir {
     }
 
     pub(crate) fn dir(&self) -> MappedRwLockReadGuard<'_, RawRwLock, *mut DIR> {
-        RwLockReadGuard::map(self.0.0.read(), |f| &f.1.as_ptr())
+        RwLockReadGuard::map(self.0.0.read(), |f| {
+            unsafe {std::mem::transmute(f.1.as_ptr())}
+        })
     }
 
     pub fn read(&self) -> std::io::Result<FileDirent> {
@@ -87,8 +89,11 @@ impl FileDir {
         &self,
         callback: Box<dyn Fn(Option<FileDirent>, Option<std::io::Error>) + Send>,
     ) {
+
+        let tmp_file_dir = FileDir(self.0.clone());
+
         super::a_sync::runtime().spawn(async move {
-            let tmp_file_dir = FileDir::new(path as _, dir as _);
+
             match tmp_file_dir.read() {
                 Ok(dir) => {
                     (callback)(Some(dir), None);

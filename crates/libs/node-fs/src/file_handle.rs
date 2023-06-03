@@ -47,7 +47,7 @@ impl FileHandle {
 
     pub fn append_file_with_bytes(
         &mut self,
-        data: ByteBuf,
+        data: Buffer,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
@@ -84,7 +84,7 @@ impl FileHandle {
     }
 
     pub fn fd(&self) -> RawFd {
-        self.file.as_raw_fd()
+        self.0.as_raw_fd()
     }
 
     pub fn read(
@@ -144,7 +144,7 @@ impl FileHandle {
 
     pub fn write(
         &mut self,
-        buffer: ByteBuf,
+        buffer: Buffer,
         offset: usize,
         length: usize,
         position: isize,
@@ -177,7 +177,7 @@ impl FileHandle {
 
     pub fn write_file_with_bytes(
         &mut self,
-        data: ByteBuf,
+        data: Buffer,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
@@ -186,7 +186,7 @@ impl FileHandle {
 
     pub fn writev(
         &mut self,
-        buffers: Vec<ByteBuf>,
+        buffers: Vec<Buffer>,
         position: c_long,
         callback: Arc<AsyncClosure<usize, std::io::Error>>,
     ) {

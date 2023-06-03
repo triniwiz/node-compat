@@ -4,7 +4,7 @@ use std::path::Path;
 use libc::c_uint;
 use crate::constants::*;
 
-#[cfg(any(target_os = "android"))]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 pub fn copy_file(from: &Path, to: &Path, mode: c_uint) -> io::Result<()> {
     use crate::{FILE_COPY_OPTIONS_COPYFILE_EXCL, FILE_COPY_OPTIONS_COPYFILE_FICLONE};
     use std::fs;

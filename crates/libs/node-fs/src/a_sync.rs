@@ -11,8 +11,11 @@ use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use libc::{c_char, c_int, c_long, c_uint, c_ulong, c_ulonglong, c_ushort};
+use notify::{Config, EventKind, recommended_watcher, RecommendedWatcher};
+use notify::event::{AccessKind, CreateKind, DataChange, MetadataKind, ModifyKind, RemoveKind, RenameMode};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
@@ -55,7 +58,7 @@ unsafe impl<T, U> Sync for AsyncClosure<T, U> {}
 unsafe impl<T, U> Send for AsyncClosure<T, U> {}
 
 
-#[repr(transparent)]
+#[derive(Debug)]
 struct WatchEventInner {
     pub(crate) filename: Option<String>,
     pub(crate) event_type: Option<String>,
@@ -67,9 +70,9 @@ pub struct WatchEvent(WatchEventInner);
 
 impl WatchEvent {
     pub fn new<S: Into<String>>(filename: S, event_type: S) -> Self {
-            Self (WatchEventInner {
-            filename: Some(filename),
-            event_type: Some(event_type)
+        Self(WatchEventInner {
+            filename: Some(filename.into()),
+            event_type: Some(event_type.into()),
         })
     }
 
@@ -78,7 +81,7 @@ impl WatchEvent {
     }
 }
 
-#[repr(transparent)]
+#[derive(Debug)]
 pub struct FileWatchEventInner {
     pub(crate) current: Option<FileStat>,
     pub(crate) previous: Option<FileStat>,
@@ -90,7 +93,7 @@ pub struct FileWatchEvent(FileWatchEventInner);
 
 impl FileWatchEvent {
     pub fn new(current: FileStat, previous: FileStat) -> Self {
-        Self ( FileWatchEventInner {
+        Self(FileWatchEventInner {
             current: Some(current),
             previous: Some(previous),
         })
@@ -107,7 +110,11 @@ pub(crate) fn runtime() -> &'static Runtime {
     INSTANCE.get_or_init(|| {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
         set_handler(&mut builder);
-        builder.build().unwrap()
+        let rt = builder
+            .enable_all()
+            .build().unwrap();
+
+        rt
     })
 }
 
@@ -120,7 +127,13 @@ fn set_handler(builder: &mut tokio::runtime::Builder) {
     });
 }
 
-fn set_handler(_builder: &mut tokio::runtime::Builder){}
+fn set_handler(builder: &mut tokio::runtime::Builder) {
+    builder.on_thread_start(||{
+        tokio::spawn(async {
+            tokio::task::yield_now().await
+        });
+    });
+}
 
 
 #[allow(dead_code)]
@@ -564,7 +577,9 @@ pub fn read(
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
     let callback = Arc::clone(&callback);
+    let mut buffer = buffer.clone();
     runtime().spawn(async move {
+
         match super::sync::read(fd, buffer.buffer_mut(), offset, length, position) {
             Ok(read) => {
                 callback.on_success(Some(read));
@@ -740,6 +755,7 @@ pub fn rmdir(
                 callback.on_success(None);
             }
             Err(error) => {
+                let error = std::io::Error::new(std::io::ErrorKind::Other, error.to_string());
                 callback.on_error(Some(error));
             }
         }
@@ -751,7 +767,7 @@ pub fn rm(
     max_retries: c_int,
     recursive: bool,
     retry_delay: c_ulonglong,
-    callback: Arc<AsyncClosure<(), Error>>,
+    callback: Arc<AsyncClosure<(), node_core::error::AnyError>>,
 ) {
     let path = path.to_string();
     let callback = Arc::clone(&callback);
@@ -908,7 +924,7 @@ pub fn watch(
     _encoding: &str,
     callback: Arc<AsyncClosure<WatchEvent, Error>>,
 ) {
-    use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+    use notify::{recommended_watcher, RecursiveMode, Watcher};
     use std::sync::mpsc::channel;
     use std::time::Duration;
     let filename = filename.to_string();
@@ -920,130 +936,115 @@ pub fn watch(
         } else {
             RecursiveMode::NonRecursive
         };
+
         let (tx, rx) = channel();
-        {
-            let mut map = map.lock();
 
-            let has_key = map.contains_key(&filename);
-            if has_key {
-                if let Some(item) = map.get_mut(&filename) {
-                    item.callbacks.push(callback)
+        let watcher = RecommendedWatcher::new(tx, notify::Config::default());
+
+
+        match watcher {
+            Ok(mut watcher) => {
+                {
+                    let mut map = map.lock();
+
+                    let has_key = map.contains_key(&filename);
+                    if has_key {
+                        if let Some(item) = map.get_mut(&filename) {
+                            item.callbacks.push(callback)
+                        }
+                        return;
+                    }
+
+                    if let Err(error) = watcher.watch(Path::new(filename.as_str()), recursive) {
+                        callback.on_error(Some(Error::new(
+                            ErrorKind::Other,
+                            error.to_string(),
+                        )));
+                        return;
+                    }
+
+                    let item = WatcherItem {
+                        watcher,
+                        callbacks: vec![callback],
+                        is_alive: AtomicBool::new(true),
+                        persistent,
+                    };
+
+                    map.insert(filename.clone(), item);
                 }
-                return;
-            }
-            let watcher = watcher(tx, Duration::from_millis(0));
 
-            if let Err(error) = watcher {
-                callback.on_error(Some(std::io::Error::new(
-                    ErrorKind::Other,
-                    error.to_string(),
-                )));
-                return;
-            }
+                for event in rx {
+                    let mut map = map.lock();
+                    match event {
+                        Ok(event) => {
+                            if let Some(item) = map.get(&filename) {
+                                if !item.is_alive.load(Ordering::SeqCst) {
+                                    map.remove(&filename);
+                                    break;
+                                }
 
-            let mut watcher = watcher.unwrap();
+                                if item.callbacks.is_empty() && !item.persistent {
+                                    map.remove(&filename);
+                                    break;
+                                }
 
-            if let Err(error) = watcher.watch(&filename, recursive) {
-                callback.on_error(Some(std::io::Error::new(
-                    ErrorKind::Other,
-                    error.to_string(),
-                )));
-                return;
-            }
-
-            let item = WatcherItem {
-                watcher,
-                callbacks: vec![callback],
-                is_alive: AtomicBool::new(true),
-                persistent,
-            };
-
-            map.insert(filename.clone(), item);
-        }
-
-        loop {
-            let mut map = map.lock();
-            match rx.recv() {
-                Ok(event) => {
-                    if let Some(item) = map.get(&filename) {
-                        if !item.is_alive.load(Ordering::SeqCst) {
-                            map.remove(&filename);
-                            break;
+                                let mut event_type = "";
+                                let mut event_file_name = PathBuf::new();
+                                match event.kind {
+                                    EventKind::Create(_) => {
+                                        event_type = "rename";
+                                        event_file_name = event.paths.first().map(|f| f.clone()).unwrap_or(PathBuf::default());
+                                    }
+                                    EventKind::Modify(kind) => {
+                                        match kind {
+                                            ModifyKind::Name(_) => {
+                                                event_type = "rename";
+                                                event_file_name = event.paths.first().map(|f| f.clone()).unwrap_or(PathBuf::default());
+                                            }
+                                            _ => {
+                                                event_type = "change";
+                                                event_file_name = event.paths.first().map(|f| f.clone()).unwrap_or(PathBuf::default());
+                                            }
+                                        }
+                                    }
+                                    EventKind::Remove(_) => {
+                                        event_type = "change";
+                                        event_file_name = event.paths.first().map(|f| f.clone()).unwrap_or(PathBuf::default());
+                                    }
+                                    EventKind::Access(_) => {}
+                                    _ => {}
+                                }
+                                for callback in item.callbacks.iter() {
+                                    callback.on_success(Some(WatchEvent::new(
+                                        event_file_name.to_string_lossy().as_ref(),
+                                        event_type,
+                                    )))
+                                }
+                            }
                         }
-
-                        if item.callbacks.is_empty() && !item.persistent {
-                            map.remove(&filename);
-                            break;
-                        }
-
-                        let mut event_err = None;
-                        let mut event_type = "";
-                        let mut event_file_name = std::path::PathBuf::new();
-                        match event {
-                            DebouncedEvent::NoticeWrite(path) => {
-                                event_type = "change";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::NoticeRemove(path) => {
-                                event_type = "change";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::Create(path) => {
-                                event_type = "rename";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::Write(path) => {
-                                event_type = "change";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::Chmod(path) => {
-                                event_type = "change";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::Remove(path) => {
-                                event_type = "rename";
-                                event_file_name = path;
-                            }
-                            DebouncedEvent::Rename(_source_path, dest_path) => {
-                                event_type = "rename";
-                                event_file_name = dest_path;
-                            }
-                            DebouncedEvent::Error(error, _) => {
-                                event_err = Some(error);
-                            }
-                            _ => {}
-                        }
-                        for callback in item.callbacks.iter() {
-                            match event_err.as_ref() {
-                                None => callback.on_success(Some(WatchEvent::new(
-                                    event_file_name.to_string_lossy().as_ref(),
-                                    event_type,
-                                ))),
-                                Some(error) => {
+                        Err(error) => {
+                            if let Some(item) = map.get(&filename) {
+                                if !item.is_alive.load(Ordering::SeqCst) {
+                                    map.remove(&filename);
+                                    break;
+                                }
+                                for callback in item.callbacks.iter() {
                                     callback.on_error(Some(Error::new(
                                         ErrorKind::Other,
                                         error.to_string(),
                                     )));
                                 }
                             }
-                        }
-                    }
-                }
-                Err(error) => {
-                    if let Some(item) = map.get(&filename) {
-                        if !item.is_alive.load(Ordering::SeqCst) {
-                            map.remove(&filename);
                             break;
                         }
-                        for callback in item.callbacks.iter() {
-                            callback.on_error(Some(Error::new(
-                                ErrorKind::Other,
-                                error.to_string(),
-                            )));
-                        }
                     }
-                    break;
                 }
+            }
+            Err(error) => {
+                callback.on_error(Some(Error::new(
+                    ErrorKind::Other,
+                    error.to_string(),
+                )));
             }
         }
     });
@@ -1120,7 +1121,13 @@ pub fn watch_file(
                 }
                 return;
             }
-            let watcher = PollWatcher::with_delay_ms(tx, interval as u32);
+            let config = Config::default()
+                .with_poll_interval(
+                    Duration::from_secs(interval)
+                );
+
+
+            let watcher = PollWatcher::new(tx, config);
 
             if let Err(error) = watcher {
                 callback.on_error(Some(Error::new(
@@ -1132,7 +1139,7 @@ pub fn watch_file(
 
             let mut watcher = watcher.unwrap();
 
-            if let Err(error) = watcher.watch(&filename, RecursiveMode::NonRecursive) {
+            if let Err(error) = watcher.watch(Path::new(&filename), RecursiveMode::NonRecursive) {
                 callback.on_error(Some(Error::new(
                     ErrorKind::Other,
                     error.to_string(),
@@ -1151,40 +1158,31 @@ pub fn watch_file(
         }
 
         let mut previous_stat = FileStat::default();
-        loop {
+
+        for event in rx {
             let mut map = map.lock();
-            match rx.recv() {
-                Ok(event) => {
+            match event {
+                Ok(op) => {
                     if let Some(item) = map.get(&filename) {
                         if !item.is_alive.load(Ordering::SeqCst) {
                             map.remove(&filename);
                             break;
                         }
-                        let mut event_err = None;
+
                         let mut event_file_name = PathBuf::new();
 
-                        match event.op {
-                            Ok(op) => {
-                                if op == notify::op::Op::CHMOD
-                                    || op == notify::op::Op::CREATE
-                                    || op == notify::op::Op::REMOVE
-                                    || op == notify::op::Op::RENAME
-                                    || op == notify::op::Op::WRITE
-                                {
-                                    event_file_name = event.path.unwrap_or_default()
-                                }
+                        match op.kind {
+                            EventKind::Create(_) |
+                            EventKind::Remove(_) |
+                            EventKind::Modify(_) => {
+                                event_file_name = op.paths.first().map(|f| f.clone()).unwrap_or(PathBuf::default());
                             }
-                            Err(error) => {
-                                event_err = Some(error);
-                            }
+                            _ => {}
                         }
 
-                        let mut current_stat = FileStat::default();
-                        if event_err.is_none() {
-                            current_stat =
-                                super::sync::stat(event_file_name.to_string_lossy().as_ref())
-                                    .map_or_else(|_| FileStat::default(), |v| handle_meta(&v));
-                        }
+                        let mut current_stat =
+                            super::sync::stat(event_file_name.to_string_lossy().as_ref())
+                                .map_or_else(|_| FileStat::default(), |v| handle_meta(&v));
 
                         if item.callbacks.is_empty() && !item.persistent {
                             map.remove(&filename);
@@ -1192,23 +1190,13 @@ pub fn watch_file(
                         }
 
                         for callback in item.callbacks.iter() {
-                            match event_err.as_ref() {
-                                None => callback.on_success(Some(FileWatchEvent::new(
-                                    current_stat,
-                                    previous_stat,
-                                ))),
-                                Some(error) => {
-                                    callback.on_error(Some(Error::new(
-                                        ErrorKind::Other,
-                                        error.to_string(),
-                                    )));
-                                }
-                            }
+                            callback.on_success(Some(FileWatchEvent::new(
+                                current_stat,
+                                previous_stat,
+                            )))
                         }
 
-                        if event_err.is_none() {
-                            previous_stat = current_stat;
-                        }
+                        previous_stat = current_stat;
                     }
                 }
                 Err(error) => {

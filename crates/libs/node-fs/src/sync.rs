@@ -17,12 +17,13 @@ use backoff::ExponentialBackoff;
 use faccess::PathExt;
 use libc::{c_char, c_int, c_long, c_uint, c_ushort};
 use rand::{thread_rng, Rng};
+use node_buffer::Buffer;
 
 use crate::file_dir::FileDir;
 use crate::file_dirent::FileDirent;
 use crate::file_handle::FileHandle;
 use crate::{
-    ByteBuf, ByteBufMut, FILE_ACCESS_OPTIONS_F_OK, FILE_ACCESS_OPTIONS_R_OK,
+    FILE_ACCESS_OPTIONS_F_OK, FILE_ACCESS_OPTIONS_R_OK,
     FILE_ACCESS_OPTIONS_W_OK, FILE_ACCESS_OPTIONS_X_OK, FILE_OPEN_OPTIONS_O_APPEND,
     FILE_OPEN_OPTIONS_O_CREAT, FILE_OPEN_OPTIONS_O_EXCL, FILE_OPEN_OPTIONS_O_RDONLY,
     FILE_OPEN_OPTIONS_O_TRUNC, FILE_OPEN_OPTIONS_O_WRONLY,
@@ -230,9 +231,11 @@ pub fn fdatasync(fd: c_int) -> std::io::Result<()> {
     ret
 }
 
-pub fn fstat(fd: c_int) -> std::io::Result<std::fs::Metadata> {
+pub fn fstat(fd: c_int) -> io::Result<fs::Metadata> {
+    println!("??");
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file.metadata();
+    println!("{:?}", metadata.as_ref());
     let _ = file.into_raw_fd();
     metadata
 }
@@ -253,7 +256,7 @@ pub fn ftruncate(fd: c_int, len: c_long) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(any(target_os = "android"))]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 pub fn futimes(fd: c_int, atime: c_long, mtime: c_long) -> std::io::Result<()> {
     let times = [
         libc::timespec {
@@ -297,12 +300,12 @@ pub fn futimes(fd: c_int, atime: c_long, mtime: c_long) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(any(target_os = "android"))]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 pub fn lchmod(path: &str, mode: c_ushort) -> std::io::Result<()> {
     let mut options = OpenOptions::new();
     options.write(true);
     let file = options.open(path)?;
-    let permissions = std::fs::Permissions::from_mode(mode.into());
+    let permissions = Permissions::from_mode(mode.into());
     file.set_permissions(permissions)
 }
 
@@ -334,7 +337,7 @@ pub fn lchown(path: &str, uid: c_uint, gid: c_uint) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(any(target_os = "android"))]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 pub fn lutimes(path: &str, atime: c_long, mtime: c_long) -> std::io::Result<()> {
     let file = File::open(path)?;
     let times = [
@@ -538,19 +541,21 @@ pub fn read_link(path: &str, _encoding: &str) -> std::io::Result<std::path::Path
     fs::read_link(path)
 }
 
-pub fn readv(fd: c_int, buffers: &mut [ByteBufMut], position: c_long) -> std::io::Result<usize> {
+pub fn readv(fd: c_int, buffers: &mut [Buffer], position: c_long) -> std::io::Result<usize> {
     let mut file = unsafe { File::from_raw_fd(fd) };
 
     if position != -1 {
         match file.seek(SeekFrom::Start(position as u64)) {
             Ok(_) => {}
-            Err(error) => return std::io::Result::Err(error),
+            Err(error) => return Err(error),
         }
     }
 
     let mut buffers: Vec<IoSliceMut> = buffers
-        .iter()
-        .map(|b| IoSliceMut::new(unsafe { std::slice::from_raw_parts_mut(b.data, b.len) }))
+        .iter_mut()
+        .map(|mut b| {
+            IoSliceMut::new(b.buffer_mut())
+        })
         .collect();
 
     file.read_vectored(buffers.as_mut_slice())
@@ -558,17 +563,17 @@ pub fn readv(fd: c_int, buffers: &mut [ByteBufMut], position: c_long) -> std::io
 
 pub fn readv_raw(
     fd: c_int,
-    buffer: *const *mut ByteBufMut,
+    buffer: *const *mut Buffer,
     buffer_len: usize,
     position: c_long,
-) -> std::io::Result<usize> {
+) -> io::Result<usize> {
     let buf = unsafe { std::slice::from_raw_parts(buffer, buffer_len) };
 
     let mut slice_buf = Vec::with_capacity(buffer_len);
     unsafe {
         for item in buf.iter() {
             let item = &*(*item);
-            slice_buf.push(ByteBufMut::new(item.data, item.len))
+            slice_buf.push(item.clone())
         }
     }
 
@@ -588,9 +593,9 @@ pub fn rmdir(
     max_retries: c_int,
     recursive: bool,
     retry_delay: c_ulonglong,
-) -> std::io::Result<()> {
+) -> Result<(), node_core::error::AnyError> {
     if !recursive {
-        fs::remove_dir(path)
+        fs::remove_dir(path).map_err(|err| node_core::error::custom_error("", err.to_string()))
     } else {
         let mut max_retries_count = AtomicI32::new(max_retries);
         let op = || {
@@ -602,40 +607,27 @@ pub fn rmdir(
                     }
                     *max_retries_count.get_mut() = current - 1;
                 }
-                return match e {
-                    Error::Transient { err, .. } => {
-                        let val = e.to_string().to_lowercase();
 
-                        if val.contains("too many open files") {
-                            return Error::Transient {
-                                err,
-                                retry_after: Some(Duration::from_millis(retry_delay)),
-                            }
-                        }
+                let error_string = e.to_string();
 
-
-                        Error::Transient {
-                            err,
-                            retry_after: Some(Duration::from_millis(retry_delay)),
-                        }
-                    },
-                    Error::Permanent(err) => {
-                        if val.contains("too many open files") {
-                            return Error::Transient {
-                                err,
-                                retry_after: Some(Duration::from_millis(retry_delay)),
-                            }
-                        }
-
-                        Error::permanent(err)
+                if error_string.contains("too many open files") {
+                    return Error::Transient {
+                        err: e,
+                        retry_after: Some(Duration::from_millis(retry_delay)),
                     }
                 }
+
+                Error::permanent(e)
             })
         };
         let bf = ExponentialBackoff::default();
         backoff::retry(bf, op).map_err(|e| match e {
-            Error::Permanent(ref err) => std::io::Error::new(err.kind(), err.to_string()),
-            Error::Transient { ref err, .. } => std::io::Error::new(err.kind(), err.to_string()),
+            Error::Permanent(ref err) => {
+                node_core::error::custom_error("", err.to_string())
+            },
+            Error::Transient { ref err, .. } => {
+                node_core::error::custom_error("", err.to_string())
+            }
         })
     }
 }
@@ -645,9 +637,9 @@ pub fn rm(
     max_retries: c_int,
     recursive: bool,
     retry_delay: c_ulonglong,
-) -> std::io::Result<()> {
+) -> Result<(), node_core::error::AnyError> {
     if !recursive {
-        fs::remove_file(path)
+        fs::remove_file(path).map_err(|err| node_core::error::custom_error("", err.to_string()))
     } else {
         let mut max_retries_count = AtomicI32::new(max_retries);
         let op = || {
@@ -655,45 +647,31 @@ pub fn rm(
                 if max_retries != 0 {
                     let current = max_retries_count.load(Ordering::SeqCst);
                     if current == 0 {
-                        return backoff::Error::permanent(e);
+                        return Error::permanent(e);
                     }
                     *max_retries_count.get_mut() = current - 1;
                 }
 
-                return match e {
-                    Error::Transient { err, .. } => {
-                        let val = e.to_string().to_lowercase();
+                let error_string = e.to_string();
 
-                        if val.contains("too many open files") {
-                            return Error::Transient {
-                                err,
-                                retry_after: Some(Duration::from_millis(retry_delay)),
-                            }
-                        }
-
-
-                        Error::Transient {
-                            err,
-                            retry_after: Some(Duration::from_millis(retry_delay)),
-                        }
-                    },
-                    Error::Permanent(err) => {
-                        if val.contains("too many open files") {
-                            return Error::Transient {
-                                err,
-                                retry_after: Some(Duration::from_millis(retry_delay)),
-                            }
-                        }
-
-                        Error::permanent(err)
+                if error_string.contains("too many open files") {
+                    return Error::Transient {
+                        err: e,
+                        retry_after: Some(Duration::from_millis(retry_delay)),
                     }
                 }
+
+                Error::permanent(e)
             })
         };
         let bf = ExponentialBackoff::default();
         backoff::retry(bf, op).map_err(|e| match e {
-            Error::Permanent(ref err) => std::io::Error::new(err.kind(), err.to_string()),
-            Error::Transient { ref err, .. } => std::io::Error::new(err.kind(), err.to_string()),
+            Error::Permanent(ref err) => {
+                node_core::error::custom_error("", err.to_string())
+            },
+            Error::Transient { ref err, .. } => {
+                node_core::error::custom_error("", err.to_string())
+            }
         })
     }
 }
@@ -908,7 +886,7 @@ pub fn write_file_with_bytes_from_path(
     file.write(data).map(|_| ())
 }
 
-pub fn writev(fd: c_int, mut buffers: Vec<ByteBuf>, position: c_long) -> std::io::Result<usize> {
+pub fn writev(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> std::io::Result<usize> {
     let mut file = unsafe { File::from_raw_fd(fd) };
 
     if position != -1 {
@@ -920,7 +898,9 @@ pub fn writev(fd: c_int, mut buffers: Vec<ByteBuf>, position: c_long) -> std::io
 
     let buffers: Vec<IoSlice> = buffers
         .iter_mut()
-        .map(|b| IoSlice::new(b.as_slice()))
+        .map(|b| {
+            IoSlice::new(b.buffer())
+        })
         .collect();
 
     file.write_vectored(buffers.as_slice())
@@ -928,7 +908,7 @@ pub fn writev(fd: c_int, mut buffers: Vec<ByteBuf>, position: c_long) -> std::io
 
 pub fn writev_raw(
     fd: c_int,
-    buffer: *const *const ByteBuf,
+    buffer: *const *const Buffer,
     buffer_len: usize,
     position: c_long,
 ) -> std::io::Result<usize> {
@@ -937,7 +917,7 @@ pub fn writev_raw(
     unsafe {
         for item in buf.iter() {
             let item = &*(*item);
-            slice_buf.push(ByteBuf::new(item.data, item.len))
+            slice_buf.push(item.clone())
         }
     }
 
