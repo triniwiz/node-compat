@@ -52,7 +52,7 @@ impl FileDir {
 
     pub fn close_async(&self, callback: Box<dyn Fn(Option<std::io::Error>) + Send>) {
         let file_dir = self.clone();
-        super::a_sync::runtime().spawn(async move {
+        let _ = node_core::thread::spawn(move || {
             let file_dir = file_dir;
             match file_dir.close() {
                 Ok(_) => {
@@ -92,7 +92,7 @@ impl FileDir {
 
         let tmp_file_dir = FileDir(self.0.clone());
 
-        super::a_sync::runtime().spawn(async move {
+        let _ = node_core::thread::spawn( move  ||{
 
             match tmp_file_dir.read() {
                 Ok(dir) => {

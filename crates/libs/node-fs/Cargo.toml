@@ -14,7 +14,6 @@ faccess = { git = "https://github.com/MightyPork/faccess", rev = "0c94ef6d4b08a6
 notify = "6.0.0"
 backoff = { git = "https://github.com/ihrwein/backoff", rev = "08f4e2111ea4b856b24556555d5c6ecf14cfa69d" }
 num_cpus = "1.15.0"
-tokio = { version = "1.28.2", features = ["full"] }
 log = "0.4.18"
 rand = "0.8.5"
 

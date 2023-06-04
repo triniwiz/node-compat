@@ -232,10 +232,8 @@ pub fn fdatasync(fd: c_int) -> std::io::Result<()> {
 }
 
 pub fn fstat(fd: c_int) -> io::Result<fs::Metadata> {
-    println!("??");
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file.metadata();
-    println!("{:?}", metadata.as_ref());
     let _ = file.into_raw_fd();
     metadata
 }
@@ -523,18 +521,18 @@ pub fn readdir_with_file(path: &str, _encoding: &str) -> std::io::Result<Vec<OsS
     Ok(result)
 }
 
-pub fn read_file(path: &str, flags: c_int) -> std::io::Result<Vec<u8>> {
+pub fn read_file(path: &str, flags: c_int) -> std::io::Result<Buffer> {
     let mut file = file_from_path_str(path, flags, 0)?;
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)?;
-    Ok(buf)
+    Ok(Buffer::from_vec(buf))
 }
 
-pub fn read_file_with_fd(fd: c_int, _flags: i32) -> std::io::Result<Vec<u8>> {
-    let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+pub fn read_file_with_fd(fd: c_int, _flags: i32) -> std::io::Result<Buffer> {
+    let mut file = unsafe { File::from_raw_fd(fd) };
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)?;
-    Ok(buf)
+    Ok(Buffer::from_vec(buf))
 }
 
 pub fn read_link(path: &str, _encoding: &str) -> std::io::Result<std::path::PathBuf> {

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use libc::{c_int, c_long, c_uint, c_ushort};
 use node_buffer::Buffer;
 
-use crate::a_sync::{runtime, AsyncClosure};
+use crate::a_sync::{AsyncClosure};
 use crate::file_stat::FileStat;
 use crate::sync::open_handle_with_path_str;
 
@@ -14,7 +14,7 @@ pub struct FileHandle(File);
 #[allow(non_snake_case)]
 impl FileHandle {
     pub fn new(file: File) -> Self {
-        Self (file)
+        Self(file)
     }
 
     pub fn new_async(
@@ -24,7 +24,7 @@ impl FileHandle {
         callback: Arc<AsyncClosure<FileHandle, std::io::Error>>,
     ) {
         let path = path.to_string();
-        runtime().spawn_blocking(
+        let _ = node_core::thread::spawn(
             move || match open_handle_with_path_str(&path, flags, mode) {
                 Ok(handle) => {
                     callback.on_success(Some(handle));
