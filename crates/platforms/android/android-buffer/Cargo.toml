@@ -1,0 +1,9 @@
+[package]
+name = "android-buffer"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+node-buffer = { path = "../../../libs/node-buffer" }
+jni = "0.21.1"
