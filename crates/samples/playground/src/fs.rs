@@ -2,6 +2,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::Arc;
 use node_buffer::Buffer;
+use node_fs::a_sync::{FileWatchEvent, WatchEvent};
 use node_fs::file_handle::FileHandle;
 
 pub fn run() {
@@ -28,4 +29,45 @@ pub fn run() {
         })
     ));
     FileHandle::new_async(test_txt.as_os_str().to_string_lossy().as_ref(), node_fs::FILE_ACCESS_OPTIONS_R_OK, node_fs::FILE_OPEN_OPTIONS_O_RDWR, callback.clone());
+
+
+    // let watch_callback = Arc::new(node_fs::a_sync::AsyncClosure::<FileWatchEvent, std::io::Error>::new(
+    //     Box::new(|result, error|{
+    //         println!("watch error {:?}", error);
+    //         match result {
+    //             None => {}
+    //             Some(event) => {
+    //                 println!("watch event {:?}", event);
+    //             }
+    //         }
+    //     })
+    // ));
+    //
+    // node_fs::a_sync::watch_file(test_txt.as_os_str().to_string_lossy().as_ref(), false, true, 0, watch_callback);
+    //
+
+
+
+    let watch_callback = Arc::new(node_fs::a_sync::AsyncClosure::<WatchEvent, std::io::Error>::new(
+        Box::new(|result, error|{
+            if let Some(error) = error {
+                println!("watch error {:?}", error);
+            }
+            match result {
+                None => {}
+                Some(event) => {
+                    println!("watch event {:?}", event);
+                }
+            }
+        })
+    ));
+
+    let mut current = std::env::current_dir().unwrap().to_string_lossy().as_ref().to_string()  + "/";
+
+    node_fs::a_sync::watch(current.as_str(), false, true, "", watch_callback);
+
+
+    loop {
+
+    }
 }

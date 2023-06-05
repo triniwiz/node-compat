@@ -967,7 +967,9 @@ pub fn watch(
                         return;
                     }
 
-                    if let Err(error) = watcher.watch(Path::new(filename.as_str()), recursive) {
+                    let path = PathBuf::from(filename.as_str());
+
+                    if let Err(error) = watcher.watch(path.as_path(), recursive) {
                         callback.on_error(Some(Error::new(
                             ErrorKind::Other,
                             error.to_string(),
@@ -1025,6 +1027,9 @@ pub fn watch(
                                     }
                                     EventKind::Access(_) => {}
                                     _ => {}
+                                }
+                                if event_type.is_empty() || !event_file_name.to_str().map(|s| !s.is_empty()).unwrap_or(false) {
+                                  continue
                                 }
                                 for callback in item.callbacks.iter() {
                                     callback.on_success(Some(WatchEvent::new(
