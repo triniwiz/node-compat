@@ -2,9 +2,14 @@
 members = [
     "crates/libs/*",
     "crates/samples/*",
-    "crates/platforms/android/*",
+    "crates/platforms/android",
     "crates/platforms/ios/*",
 ]
+
+resolver = "2"
+
+[dev.release]
+panic = "abort"
 
 [profile.release]
 panic = "abort"

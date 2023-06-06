@@ -300,9 +300,25 @@ impl Buffer {
         BigEndian::write_i64(buffer, value);
     }
 
+    pub fn write_big_int64be_bytes(&mut self, value: &[u8], offset: Option<usize>) {
+        let buffer = self.buffer_mut();
+        let length = buffer.len();
+        let value = BigEndian::read_i64(value);
+        let buffer = &mut buffer[offset.unwrap_or(0)..length];
+        BigEndian::write_i64(buffer, value);
+    }
+
     pub fn write_big_int64le(&mut self, value: i64, offset: Option<usize>) {
         let buffer = self.buffer_mut();
         let length = buffer.len();
+        let buffer = &mut buffer[offset.unwrap_or(0)..length];
+        LittleEndian::write_i64(buffer, value);
+    }
+
+    pub fn write_big_int64le_bytes(&mut self, value: &[u8], offset: Option<usize>) {
+        let buffer = self.buffer_mut();
+        let length = buffer.len();
+        let value = LittleEndian::read_i64(value);
         let buffer = &mut buffer[offset.unwrap_or(0)..length];
         LittleEndian::write_i64(buffer, value);
     }
@@ -314,9 +330,25 @@ impl Buffer {
         BigEndian::write_u64(buffer, value);
     }
 
+    pub fn write_big_uint64be_bytes(&mut self, value: &[u8], offset: Option<usize>) {
+        let buffer = self.buffer_mut();
+        let length = buffer.len();
+        let value = BigEndian::read_u64(value);
+        let buffer = &mut buffer[offset.unwrap_or(0)..length];
+        BigEndian::write_u64(buffer, value);
+    }
+
     pub fn write_big_uint64le(&mut self, value: u64, offset: Option<usize>) {
         let buffer = self.buffer_mut();
         let length = buffer.len();
+        let buffer = &mut buffer[offset.unwrap_or(0)..length];
+        LittleEndian::write_u64(buffer, value);
+    }
+
+    pub fn write_big_uint64le_bytes(&mut self, value: &[u8], offset: Option<usize>) {
+        let buffer = self.buffer_mut();
+        let length = buffer.len();
+        let value = LittleEndian::read_u64(value);
         let buffer = &mut buffer[offset.unwrap_or(0)..length];
         LittleEndian::write_u64(buffer, value);
     }
@@ -420,11 +452,34 @@ impl Buffer {
         BigEndian::read_i64(buffer)
     }
 
+    pub fn read_big_int64be_bytes(&self, offset: Option<usize>) -> [u8;8] {
+        let buffer = self.buffer();
+        let length = buffer.len();
+        let buffer = &buffer[offset.unwrap_or(0)..length];
+        let mut ret = [0_u8;8];
+        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1)};
+        let _ = BigEndian::read_i64_into(buffer, store);
+        ret
+    }
+
     pub fn read_big_int64le(&self, offset: Option<usize>) -> i64 {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
         LittleEndian::read_i64(buffer)
+    }
+
+    pub fn read_big_int64le_bytes(&self, offset: Option<usize>) -> [u8;8] {
+        let buffer = self.buffer();
+        let length = buffer.len();
+        let buffer = &buffer[offset.unwrap_or(0)..length];
+
+        let mut ret = [0_u8;8];
+        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1)};
+
+        let _ = LittleEndian::read_i64_into(buffer, store);
+
+        ret
     }
 
     pub fn read_big_uint64be(&self, offset: Option<usize>) -> u64 {
@@ -434,11 +489,39 @@ impl Buffer {
         BigEndian::read_u64(buffer)
     }
 
+    pub fn read_big_uint64be_bytes(&self, offset: Option<usize>) -> [u8;8] {
+        let buffer = self.buffer();
+        let length = buffer.len();
+        let buffer = &buffer[offset.unwrap_or(0)..length];
+
+        let mut ret = [0_u8;8];
+        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1)};
+
+
+        let _ = BigEndian::read_u64_into(buffer, store);
+
+        ret
+    }
+
     pub fn read_big_uint64le(&self, offset: Option<usize>) -> u64 {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
         LittleEndian::read_u64(buffer)
+    }
+
+    pub fn read_big_uint64le_bytes(&self, offset: Option<usize>) -> [u8;8] {
+        let buffer = self.buffer();
+        let length = buffer.len();
+        let buffer = &buffer[offset.unwrap_or(0)..length];
+
+        let mut ret = [0_u8;8];
+        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1)};
+
+
+        let _ = LittleEndian::read_u64_into(buffer, store);
+
+        ret
     }
 
     pub fn atob(value: CString) -> String {
@@ -583,7 +666,8 @@ impl Buffer {
                 let _ = buf.write(ret.as_slice());
             }
             BufferInner::Reference(ref buf) => {
-                let (data, size) = *buf.write();
+                let (data, size) = *buf.read();
+
                 if data.is_null() || size == 0 {
                     return self;
                 }

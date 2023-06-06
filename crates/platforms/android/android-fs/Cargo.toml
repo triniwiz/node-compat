@@ -1,9 +1,0 @@
-[package]
-name = "android-fs"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-node-fs = { path = "../../../libs/node-fs" }
-jni = "0.21.1"
-parking_lot = "0.12.1"

@@ -1,9 +1,7 @@
-extern crate core;
-
 use std::ffi::CString;
 use jni::JNIEnv;
-use jni::objects::{JByteBuffer, JClass, JObject, JObjectArray, JPrimitiveArray, JString, ReleaseMode};
-use jni::sys::{jbyte, jdouble, jfloat, jint, jlong, jobject, jobjectArray, jshort, jstring};
+use jni::objects::{JByteArray, JByteBuffer, JClass, JObject, JObjectArray, JPrimitiveArray, JString, ReleaseMode};
+use jni::sys::{jbyte, jbyteArray, jdouble, jfloat, jint, jlong, jobject, jobjectArray, jshort, jstring};
 use node_buffer::{Buffer, StringEncoding};
 
 fn get_offset(offset: jlong) -> Option<usize> {
@@ -14,7 +12,7 @@ fn get_offset(offset: jlong) -> Option<usize> {
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeAlloc(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeAlloc(
     mut env: JNIEnv,
     _: JClass,
     size: jlong,
@@ -54,7 +52,23 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeAll
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeConcat(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeDestroy(
+    _env: JNIEnv,
+    _: JClass,
+    buffer: jlong,
+) {
+    let mut buffer = unsafe { Buffer::get_ptr(buffer) };
+
+    if buffer.is_null() {
+        return;
+    }
+
+    let _ = unsafe { Box::from_raw(buffer) };
+}
+
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeConcat(
     mut env: JNIEnv,
     _: JClass,
     array: jobjectArray,
@@ -95,7 +109,84 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeCon
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeFromBuffer(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFromString(
+    mut env: JNIEnv,
+    _: JClass,
+    text: JString,
+    encoding: jint,
+) -> jlong {
+    let buffer = match env.get_string(&text) {
+        Ok(text) => {
+            match StringEncoding::try_from(encoding) {
+                Ok(encoding) => {
+                    let text = CString::new(text.to_string_lossy().to_string()).unwrap();
+                    Buffer::from_string(text, encoding)
+                }
+                Err(error) => {
+                    let _ = env.throw(error);
+                    Buffer::default()
+                }
+            }
+        }
+        Err(error) => {
+            let _ = env.throw(error.to_string());
+            Buffer::default()
+        }
+    };
+
+    Box::into_raw(
+        Box::new(buffer)
+    ) as jlong
+}
+
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFromArray(
+    mut env: JNIEnv,
+    _: JClass,
+    slice: jbyteArray,
+) -> jlong {
+    let slice = unsafe { JPrimitiveArray::from_raw(slice) };
+
+    let buffer = match env.get_array_elements_critical(&slice, ReleaseMode::NoCopyBack) {
+        Ok(array) => {
+            let slice = std::slice::from_raw_parts(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len());
+            Buffer::from_slice(slice)
+        }
+        Err(_) => {
+            Buffer::default()
+        }
+    };
+    Box::into_raw(
+        Box::new(buffer)
+    ) as jlong
+}
+
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeCopyBytesFrom(
+    mut env: JNIEnv,
+    _: JClass,
+    buffer: JByteBuffer,
+    offset: jlong,
+    length: jlong,
+) -> jlong {
+    let buffer = match (env.get_direct_buffer_address(&buffer), env.get_direct_buffer_capacity(&buffer)) {
+        (Ok(data), Ok(size)) => {
+            let buf = std::slice::from_raw_parts_mut(data, size);
+            Buffer::from_vec(buf.to_vec())
+        }
+        _ => {
+            Buffer::default()
+        }
+    };
+    Box::into_raw(
+        Box::new(buffer)
+    ) as jlong
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFromBuffer(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -120,7 +211,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeFro
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeAtob(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeAtob(
     mut env: JNIEnv,
     _: JClass,
     text: JString,
@@ -138,7 +229,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeAto
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeBtoa(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeBtoa(
     mut env: JNIEnv,
     _: JClass,
     text: JString,
@@ -157,7 +248,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeBto
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeFillString(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFillString(
     mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -187,7 +278,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeFil
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeToString(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeToString(
     mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -204,7 +295,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeToS
 
     match StringEncoding::try_from(encoding) {
         Ok(encoding) => {
-           let string = buffer.as_string(Some(encoding), get_offset(start), get_offset(end));
+            let string = buffer.as_string(Some(encoding), get_offset(start), get_offset(end));
             env.new_string(string).unwrap().into_raw()
         }
         Err(error) => {
@@ -216,7 +307,23 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeToS
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeLength(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeToPrintString(
+    mut env: JNIEnv,
+    _: JClass,
+    buffer: jlong,
+) -> jstring {
+    let mut buffer = unsafe { Buffer::get_ptr(buffer) };
+
+    if buffer.is_null() {
+        return env.new_string("").unwrap().into_raw();
+    }
+
+    return unsafe { env.new_string(format!("{}", &*buffer)).unwrap().into_raw() };
+}
+
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeLength(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -234,7 +341,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeLen
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeBuffer(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeBuffer(
     mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -262,7 +369,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeBuf
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt8(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt8(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -281,7 +388,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt8(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt8(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -300,7 +407,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt16BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt16BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -319,7 +426,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt16LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt16LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -338,7 +445,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt16BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt16BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -357,7 +464,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt16LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt16LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -376,7 +483,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt32BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt32BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -395,7 +502,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt32LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt32LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -414,7 +521,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt32BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt32BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -433,7 +540,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt32LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt32LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -452,7 +559,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteFloatBE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteFloatBE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -471,7 +578,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteFloatLE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteFloatLE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -491,7 +598,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteDoubleBE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteDoubleBE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -510,7 +617,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteDoubleLE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteDoubleLE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -530,11 +637,11 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt64BE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt64BE(
+    mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
-    value: jlong,
+    value: jbyteArray,
     offset: jlong,
 ) {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
@@ -545,15 +652,22 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.write_big_uint64be(value as u64, get_offset(offset));
+    let value = unsafe { JByteArray::from_raw(value) };
+     match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+         Ok(array) => {
+             let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
+             buffer.write_big_uint64be_bytes(value, get_offset(offset));
+         }
+         Err(_) => {}
+     };
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteUInt64LE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteUInt64LE(
+    mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
-    value: jlong,
+    value: jbyteArray,
     offset: jlong,
 ) {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
@@ -564,15 +678,23 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.write_big_uint64le(value as u64, get_offset(offset));
+    let value = unsafe { JByteArray::from_raw(value) };
+    match  unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+        Ok(array) => {
+            let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
+            buffer.write_big_uint64le_bytes(value, get_offset(offset));
+        }
+        Err(_) => {}
+    };
+
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt64BE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt64BE(
+    mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
-    value: jlong,
+    value: jbyteArray,
     offset: jlong,
 ) {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
@@ -583,15 +705,22 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.write_big_int64be(value, get_offset(offset));
+    let value = unsafe { JByteArray::from_raw(value) };
+    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) }  {
+        Ok(array) => {
+            let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
+            buffer.write_big_int64be_bytes(value, get_offset(offset));
+        }
+        Err(_) => {}
+    };
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWriteInt64LE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWriteInt64LE(
+    mut env: JNIEnv,
     _: JClass,
     buffer: jlong,
-    value: jlong,
+    value: jbyteArray,
     offset: jlong,
 ) {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
@@ -602,12 +731,19 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeWri
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.write_big_int64le(value, get_offset(offset));
+    let value = unsafe { JByteArray::from_raw(value) };
+    match  unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+        Ok(array) => {
+            let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
+            buffer.write_big_int64le_bytes(value, get_offset(offset));
+        }
+        Err(_) => {}
+    };
 }
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt8(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt8(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -626,7 +762,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt8(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt8(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -645,7 +781,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt16BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt16BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -664,7 +800,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt16LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt16LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -684,7 +820,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt16BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt16BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -703,7 +839,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt16LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt16LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -722,7 +858,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt32BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt32BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -741,7 +877,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt32LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt32LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -761,7 +897,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt32BE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt32BE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -780,7 +916,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt32LE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt32LE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -799,7 +935,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadFloatBE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadFloatBE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -818,7 +954,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadFloatLE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadFloatLE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -838,7 +974,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadDoubleBE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadDoubleBE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -857,7 +993,7 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadDoubleLE(
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadDoubleLE(
     _env: JNIEnv,
     _: JClass,
     buffer: jlong,
@@ -876,78 +1012,86 @@ pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeRea
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt64BE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt64BE(
+    env: JNIEnv,
     _: JClass,
     buffer: jlong,
     offset: jlong,
-) -> jlong {
+) -> jbyteArray {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
 
     if buffer.is_null() {
         // throw ??
-        return 0;
+        return env.new_byte_array(0).unwrap().into_raw();
     }
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.read_big_uint64be(get_offset(offset)) as jlong
+    let value = buffer.read_big_uint64be_bytes(get_offset(offset));
+
+    env.byte_array_from_slice(&value).unwrap().into_raw()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadUInt64LE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadUInt64LE(
+    env: JNIEnv,
     _: JClass,
     buffer: jlong,
     offset: jlong,
-) -> jlong {
+) -> jbyteArray {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
 
     if buffer.is_null() {
         // throw ??
-        return 0;
+        return env.new_byte_array(0).unwrap().into_raw();
     }
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.read_big_uint64le(get_offset(offset)) as jlong
+    let value = buffer.read_big_uint64le_bytes(get_offset(offset));
+
+    env.byte_array_from_slice(&value).unwrap().into_raw()
 }
 
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt64BE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt64BE(
+    env: JNIEnv,
     _: JClass,
     buffer: jlong,
     offset: jlong,
-) -> jlong {
+) -> jbyteArray {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
 
     if buffer.is_null() {
         // throw ??
-        return 0;
+        return env.new_byte_array(0).unwrap().into_raw();
     }
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.read_big_int64be(get_offset(offset))
+    let value = buffer.read_big_int64be_bytes(get_offset(offset));
+
+    env.byte_array_from_slice(&value).unwrap().into_raw()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node1compat_buffer_Buffer_nativeReadInt64LE(
-    _env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeReadInt64LE(
+    env: JNIEnv,
     _: JClass,
     buffer: jlong,
     offset: jlong,
-) -> jlong {
+) -> jbyteArray {
     let mut buffer = unsafe { Buffer::get_ptr(buffer) };
 
     if buffer.is_null() {
         // throw ??
-        return 0;
+        return env.new_byte_array(0).unwrap().into_raw();
     }
 
     let mut buffer = unsafe { &mut *buffer };
 
-    buffer.read_big_int64le(get_offset(offset))
+    let value = buffer.read_big_int64le_bytes(get_offset(offset));
+
+    env.byte_array_from_slice(&value).unwrap().into_raw()
 }

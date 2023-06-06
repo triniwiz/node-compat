@@ -1,0 +1,13 @@
+[package]
+name = "node-android"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "nodeandroid"
+crate-type = ["cdylib"]
+
+[dependencies]
+node-buffer = { path = "../../libs/node-buffer" }
+#node-fs = { path = "../../libs/node-fs" }
+jni = "0.21.1"
