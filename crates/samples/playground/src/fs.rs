@@ -21,7 +21,7 @@ pub fn run() {
                         })));
                     let ret = node_fs::sync::read_file_with_fd(handle.fd() as i32, 0);
 
-                    println!("data {}", ret.unwrap().to_string(None, None, None));
+                    println!("data {}", ret.unwrap().as_string(None, None, None));
 
                     handle.append_file_with_str(" NICE!!", cb.clone());
                 }

@@ -7,9 +7,9 @@ pub fn run() {
         .fill_text(CString::new("hello world").unwrap(), StringEncoding::Utf8)
         .build();
 
-    println!("{}", buffer.to_string(Some(StringEncoding::Hex), None, None));
+    println!("{}", buffer.as_string(Some(StringEncoding::Hex), None, None));
 // Prints: 68656c6c6f20776f726c64
-    println!("{}", buffer.to_string(Some(StringEncoding::Base64), None, None));
+    println!("{}", buffer.as_string(Some(StringEncoding::Base64), None, None));
 // Prints: aGVsbG8gd29ybGQ=
 
     println!("{}", Buffer::builder().fill_text(CString::new("fhqwhgads").unwrap(), StringEncoding::Utf8).build());
@@ -45,9 +45,9 @@ pub fn run() {
     }
 
 
-    println!("{}", buffer.to_string(Some(StringEncoding::Utf8), None, None));
+    println!("{}", buffer.as_string(Some(StringEncoding::Utf8), None, None));
 // Prints: abcdefghijklmnopqrstuvwxyz
-    println!("{}", buffer.to_string(Some(StringEncoding::Utf8), Some(0), Some(5)));
+    println!("{}", buffer.as_string(Some(StringEncoding::Utf8), Some(0), Some(5)));
 // Prints: abcde
 
 

@@ -3,6 +3,9 @@ name = "android-buffer"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "nodebuffer"
+crate-type = ["cdylib"]
 
 [dependencies]
 node-buffer = { path = "../../../libs/node-buffer" }

@@ -5,3 +5,12 @@ members = [
     "crates/platforms/android/*",
     "crates/platforms/ios/*",
 ]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = 3
+debug = false
+incremental = false
+strip = true
