@@ -9,11 +9,10 @@ use jni::sys::{jboolean, jlong, jobject, JNI_TRUE};
 use jni::JNIEnv;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-
-use crate::a_sync::AsyncCallback;
-use crate::android::prelude::*;
-use crate::android::{FILE_FS_WATCH_CLASS, FILE_FS_WATCH_EVENT_CLASS, JVM};
 use node_fs::a_sync::{AsyncClosure, WatchEvent};
+use crate::fs::a_sync::AsyncCallback;
+use crate::fs::{FILE_FS_WATCH_CLASS, FILE_FS_WATCH_EVENT_CLASS, JVM};
+use crate::fs::prelude::*;
 
 type WatcherCallbackMap = Arc<Mutex<HashMap<Arc<AsyncCallback>, FsWatchCallback>>>;
 
@@ -43,8 +42,8 @@ fn build_file_watch_event<'a>(env: &mut JNIEnv<'a>, event: WatchEvent) -> JObjec
     let object = env.new_object(clazz, "()V", &[]).unwrap();
     let filename = build_string_op(&env, event.filename).unwrap_or(JObject::null().into());
     let event_type = build_string_op(&env, event.event_type).unwrap_or(JObject::null().into());
-    let _ = env.set_field(object, "fileName", "Ljava/lang/String;", filename.into());
-    let _ = env.set_field(object, "eventType", "Ljava/lang/String;", event_type.into());
+    let _ = env.set_field(&object, "fileName", "Ljava/lang/String;", filename.into());
+    let _ = env.set_field(&object, "eventType", "Ljava/lang/String;", event_type.into());
     object
 }
 
@@ -52,18 +51,18 @@ fn build_fs_watch<'a>(env: &mut JNIEnv<'a>, file_name: &str, callback: jlong) ->
     let clazz = find_class(FILE_FS_WATCH_CLASS).unwrap();
     let object = env.new_object(clazz, "()V", &[]).unwrap();
     let _ = env.set_field(
-        object,
+        &object,
         "fileName",
         "Ljava/lang/String;",
         env.new_string(file_name).unwrap().into(),
     );
-    let _ = env.set_field(object, "callback", "J", callback.into());
+    let _ = env.set_field(&object, "native", "J", callback.into());
     object
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWatch(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWatch(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     persistent: jboolean,
@@ -81,13 +80,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
         inner: Arc::new(AsyncClosure {
             callback: Box::new(move |event, error| {
                 let jvm = JVM.get().unwrap();
-                let env = jvm.attach_current_thread().unwrap();
+                let mut env = jvm.attach_current_thread().unwrap();
                 if error.is_some() {
                     on_success.on_error(jni::objects::JValue::Object(
                         error_to_jstring(error.unwrap()).as_obj(),
                     ))
                 } else {
-                    on_success.on_success(build_file_watch_event(&env, event.unwrap()).into())
+                    on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
                 }
             }),
         }),
@@ -107,11 +106,11 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
         inner,
     );
 
-    build_fs_watch(&env, path.as_ref(), cb).into_inner()
+    build_fs_watch(&mut env, path.as_ref(), cb).into_inner()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeUnwatchFile(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUnwatchFile(
     _: JNIEnv,
     _: JClass,
     path: JString,
@@ -129,7 +128,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FsWatcher_nativeUnref(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeUnref(
     _: JNIEnv,
     _: JClass,
     filename: JString,
@@ -147,7 +146,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FsWatcher_native
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FsWatcher_nativeRef(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeRef(
     _env: JNIEnv,
     _: JClass,
     filename: JString,
@@ -166,13 +165,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FsWatcher_native
 
     let inner = Arc::new(AsyncClosure::new(Box::new(move |event, error| {
         let jvm = JVM.get().unwrap();
-        let env = jvm.attach_current_thread().unwrap();
+        let mut env = jvm.attach_current_thread().unwrap();
         if let Some(error) = error {
             on_success.on_error(jni::objects::JValue::Object(
                 error_to_jstring(error).as_obj(),
             ))
         } else {
-            on_success.on_success(build_file_watch_event(&env, event.unwrap()).into())
+            on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
         }
     })));
 
@@ -186,7 +185,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FsWatcher_native
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_WatcherEvent_nativeClose(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_WatcherEvent_nativeClose(
     _: JNIEnv,
     _: JClass,
     filename: JString,
@@ -206,7 +205,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_WatcherEvent_nat
                     error_to_jstring(error).as_obj(),
                 ))
             } else {
-                on_close.on_success(jni::objects::JObject::null().into())
+                on_close.on_success(JObject::null().into())
             }
         }))
             .into_arc();

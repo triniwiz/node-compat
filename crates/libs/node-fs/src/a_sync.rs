@@ -31,7 +31,7 @@ pub type OnSuccessCallback = extern "C" fn(result: Option<NonNull<c_void>>);
 pub type OnErrorCallback = extern "C" fn(error: Option<NonNull<c_void>>);
 
 pub struct AsyncClosure<T, U> {
-    pub(crate) callback: Box<dyn Fn(Option<T>, Option<U>)>,
+    pub callback: Box<dyn Fn(Option<T>, Option<U>)>,
 }
 
 impl<T, U> AsyncClosure<T, U> {

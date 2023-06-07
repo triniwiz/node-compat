@@ -4,6 +4,13 @@
 
 # How to use?
 
+
+## Rust requirements
+
+```
+target add arm-linux-androideabi i686-linux-android x86_64-linux-android aarch64-linux-android
+```
+
 This workspace manages the suite of plugins listed above. 
 
 In general, when in doubt with what to do, just `npm start`.

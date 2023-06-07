@@ -14,6 +14,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import org.nativescript.node_compat.buffer.Buffer
 import org.nativescript.node_compat.buffer.decodeHex
 import org.nativescript.node_compat.demo.ui.theme.NodeCompatDemoTheme
+import org.nativescript.node_compat.fs.FileStat
+import org.nativescript.node_compat.fs.FileSystem
 import java.math.BigInteger
 import java.nio.ByteBuffer
 
@@ -28,7 +30,6 @@ class MainActivity : ComponentActivity() {
         }
       }
     }
-
 
     val encoded = Buffer.btoa("Osei Fortune")
     println(encoded)

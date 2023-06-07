@@ -2,21 +2,16 @@ use jni::objects::{JByteBuffer, JClass, JObject, JString, JValue, ReleaseMode};
 use jni::sys::{jboolean, jbyteArray, jint, jlong, jobject, jobjectArray, JNI_TRUE};
 use jni::JNIEnv;
 use libc::{c_int, c_uint, c_ushort};
-
-use crate::android::prelude::*;
-use crate::android::FILE_SYSTEM_CLASS;
-use crate::common::fs;
-
 use node_fs::prelude::handle_meta;
-use crate::common::{ByteBuf, ByteBufMut};
-
-use super::file_dir::build_dir;
-use super::file_dirent::{build_dirents, build_dirents_paths};
-use super::file_stat::build_stat;
+use crate::fs::file_dir::build_dir;
+use crate::fs::file_dirent::{build_dirents, build_dirents_paths};
+use crate::fs::file_stat::build_stat;
+use crate::fs::FILE_SYSTEM_CLASS;
+use crate::fs::prelude::*;
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeAccessSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAccessSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     mode: jint,
@@ -29,8 +24,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeAppendFileWithBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAppendFileWithBytesSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     bytes: jbyteArray,
@@ -53,8 +48,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeAppendFileWithStringSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAppendFileWithStringSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     data: JString,
@@ -68,8 +63,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeAppendFileWithPathBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAppendFileWithPathBytesSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     bytes: jbyteArray,
@@ -94,8 +89,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeAppendFileWithPathStringSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAppendFileWithPathStringSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     data: JString,
@@ -111,8 +106,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeChmodSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeChmodSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     mode: jint,
@@ -126,8 +121,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeChownSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeChownSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     uid: jint,
@@ -141,7 +136,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeCloseSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCloseSync(
     _: JNIEnv,
     _: JClass,
     fd: jint,
@@ -150,8 +145,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeCopyFileSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCopyFileSync(
+    mut env: JNIEnv,
     _: JClass,
     src: JString,
     dest: JString,
@@ -167,7 +162,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeCopySync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCopySync(
     _: JNIEnv,
     _: JClass,
     src: JString,
@@ -180,7 +175,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeExistsSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeExistsSync(
     _: JNIEnv,
     _: JClass,
     src: JString,
@@ -190,8 +185,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFchmodSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFchmodSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     mode: jint,
@@ -203,8 +198,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFchownSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFchownSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     uid: jint,
@@ -217,8 +212,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFdatasyncSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFdatasyncSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
 ) {
@@ -229,13 +224,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFstatSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFstatSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
 ) -> jobject {
     match node_fs::sync::fstat(fd) {
-        Ok(stat) => build_stat(&env, handle_meta(&stat)).into_inner(),
+        Ok(stat) => build_stat(&mut env, handle_meta(&stat)).into_inner(),
         Err(error) => {
             let _ = env.throw(error.to_string());
             return JObject::null().into_inner();
@@ -244,8 +239,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFsyncSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFsyncSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
 ) {
@@ -256,8 +251,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFtruncateSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFtruncateSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     len: jlong,
@@ -269,8 +264,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeFutimesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeFutimesSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     atime: jlong,
@@ -283,8 +278,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeLchmodSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLchmodSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     mode: jint,
@@ -297,8 +292,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeLchownSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLchownSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     uid: jint,
@@ -312,8 +307,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeLutimesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLutimesSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     atime: jlong,
@@ -327,8 +322,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeLinkSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLinkSync(
+    mut env: JNIEnv,
     _: JClass,
     existing_path: JString,
     new_path: JString,
@@ -343,14 +338,14 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeLstatSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLstatSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
 ) -> jobject {
     let path = get_str(path, "");
     match node_fs::sync::lstat(&path) {
-        Ok(stat) => build_stat(&env, handle_meta(&stat)).into_inner(),
+        Ok(stat) => build_stat(&mut env, handle_meta(&stat)).into_inner(),
         Err(error) => {
             let _ = env.throw(error.to_string());
             return JObject::null().into_inner();
@@ -359,8 +354,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeMkdirSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeMkdirSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     mode: c_int,
@@ -374,8 +369,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeMkdtempSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeMkdtempSync(
+    mut env: JNIEnv,
     _: JClass,
     prefix: JString,
 ) -> jobject {
@@ -390,8 +385,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeOpenSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeOpenSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     flags: jint,
@@ -408,14 +403,14 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeOpenDirSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeOpenDirSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
 ) -> jobject {
     let path = get_str(path, "");
     return match node_fs::sync::opendir(&path) {
-        Ok(dir) => build_dir(&env, dir).into_inner(),
+        Ok(dir) => build_dir(&mut env, dir).into_inner(),
         Err(error) => {
             let _ = env.throw(error.to_string());
             JObject::null().into_inner()
@@ -424,8 +419,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     buffer: JByteBuffer,
@@ -433,25 +428,30 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     length: jlong,
     position: jlong,
 ) -> jlong {
-    let bytes = env.get_direct_buffer_address(buffer).unwrap();
-    return match node_fs::sync::read(
-        fd,
-        bytes,
-        offset.try_into().unwrap(),
-        length.try_into().unwrap(),
-        position.try_into().unwrap(),
-    ) {
-        Ok(read) => (read as jlong).into(),
-        Err(error) => {
-            let _ = env.throw(error.to_string());
-            0
+    match (env.get_direct_buffer_address(&buffer), env.get_direct_buffer_capacity(&buffer)) {
+        (Ok(data), Ok(size)) => {
+            let bytes = unsafe { std::slice::from_raw_parts_mut(data, size) };
+            return match node_fs::sync::read(
+                fd,
+                bytes,
+                offset.try_into().unwrap(),
+                length.try_into().unwrap(),
+                position.try_into().unwrap(),
+            ) {
+                Ok(read) => (read as jlong).into(),
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    0
+                }
+            };
         }
-    };
+        _ => 0
+    }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadWithBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadWithBytesSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     buffer: jbyteArray,
@@ -490,8 +490,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReaddirWithFileTypesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReaddirWithFileTypesSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     encoding: JString,
@@ -499,17 +499,17 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     let path = get_str(path, "");
     let encoding = get_str(encoding, "");
     match node_fs::sync::readdir_with_file_types(&path, &encoding) {
-        Ok(dirent) => build_dirents(&env, dirent),
+        Ok(dirent) => build_dirents(&mut env, dirent),
         Err(error) => {
             let _ = env.throw(error.to_string());
-            build_dirents(&env, vec![])
+            build_dirents(&mut env, vec![])
         }
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReaddirWithFileSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReaddirWithFileSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     encoding: JString,
@@ -517,17 +517,17 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     let path = get_str(path, "");
     let encoding = get_str(encoding, "");
     match node_fs::sync::readdir_with_file(&path, &encoding) {
-        Ok(dir) => build_dirents_paths(&env, dir).into(),
+        Ok(dir) => build_dirents_paths(&mut env, dir).into(),
         Err(error) => {
             let _ = env.throw(error.to_string());
-            build_dirents_paths(&env, vec![]).into()
+            build_dirents_paths(&mut env, vec![]).into()
         }
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadFileSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     flags: jint,
@@ -536,8 +536,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadFileBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileBytesSync(
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     flags: jint,
@@ -545,7 +545,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     read_file(env, path, flags, true)
 }
 
-fn read_file(env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> jobject {
+fn read_file(mut env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> jobject {
     let path = get_str(path, "");
     match node_fs::sync::read_file(&path, flags) {
         Ok(mut buf) => {
@@ -554,7 +554,7 @@ fn read_file(env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> jobject
                     .unwrap()
                     .into()
             } else {
-                let db = env.new_direct_byte_buffer(buf.as_mut_slice()).unwrap();
+                let db = unsafe { env.new_direct_byte_buffer(buf.as_mut_slice(), buf.length()).unwrap() };
                 let buf = Box::into_raw(Box::new(buf));
                 let clazz = find_class(FILE_SYSTEM_CLASS).unwrap();
                 let db: JValue = db.into();
@@ -576,7 +576,7 @@ fn read_file(env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> jobject
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadFileWithFdSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileWithFdSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -586,7 +586,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadFileBytesWithFdSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileBytesWithFdSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -622,7 +622,7 @@ fn read_file_with_fd(env: JNIEnv, fd: jint, flags: jint, to_bytes: bool) -> jobj
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadLinkSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadLinkSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -640,7 +640,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeReadvSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadvSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -664,7 +664,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeRealPathSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRealPathSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -680,7 +680,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeRenameSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRenameSync(
     env: JNIEnv,
     _: JClass,
     old_path: JString,
@@ -696,7 +696,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeRmdirSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRmdirSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -717,7 +717,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeRmSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRmSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -739,7 +739,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeStatSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeStatSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -759,7 +759,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeSymlinkSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeSymlinkSync(
     env: JNIEnv,
     _: JClass,
     target: JString,
@@ -777,7 +777,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeTruncateSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeTruncateSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -792,7 +792,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeUnlinkSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUnlinkSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -808,7 +808,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 // todo watch
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeUtimesSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUtimesSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -824,7 +824,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -850,7 +850,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteBytesSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteBytesSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -890,7 +890,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteStringSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteStringSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -910,7 +910,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithStringSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithStringSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -927,7 +927,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithBytesSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBytesSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -950,7 +950,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithBufferSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBufferSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -965,7 +965,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithStringFromPathSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithStringFromPathSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -986,7 +986,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithBytesFromPathSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBytesFromPathSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -1015,7 +1015,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWriteFileWithBufferFromPathSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBufferFromPathSync(
     env: JNIEnv,
     _: JClass,
     path: JString,
@@ -1036,7 +1036,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWritevSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWritevSync(
     env: JNIEnv,
     _: JClass,
     fd: jint,

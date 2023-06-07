@@ -4,10 +4,9 @@ use std::sync::Arc;
 use jni::objects::{JClass, JObject};
 use jni::sys::{jboolean, jlong, jobjectArray, JNI_FALSE};
 use jni::{sys::jobject, JNIEnv};
-
-use crate::android::prelude::*;
-use crate::android::{FILE_DIRENT_CLASS, OBJECT_CLASS};
 use node_fs::file_dirent::FileDirent;
+use crate::fs::{FILE_DIRENT_CLASS, OBJECT_CLASS};
+use crate::fs::prelude::*;
 
 
 pub(crate) fn build_dirent<'a>(env: &mut JNIEnv<'a>, dirent: FileDirent) -> JObject<'a> {
@@ -30,15 +29,15 @@ pub(crate) fn build_dirents(env: &mut JNIEnv, dirent: Vec<FileDirent>) -> jobjec
         .unwrap();
 
     for (i, dirent) in dirent.iter_mut().enumerate() {
-        let dirent = FileDirent(Arc::clone(&dirent.0));
+        let dirent = dirent.clone();
         let dirent = Box::into_raw(Box::new(dirent));
         let res = env
-            .new_object(clazz, "(J)V", &[(dirent as i64).into()])
+            .new_object(&clazz, "(J)V", &[(dirent as i64).into()])
             .unwrap();
-        let _ = env.set_object_array_element(object_array, i.try_into().unwrap(), res);
+        let _ = env.set_object_array_element(&object_array, i.try_into().unwrap(), res);
     }
 
-    object_array
+    object_array.into_raw()
 }
 
 pub(crate) fn build_dirents_paths(env: &mut JNIEnv, dirent: Vec<OsString>) -> jobjectArray {
@@ -50,14 +49,14 @@ pub(crate) fn build_dirents_paths(env: &mut JNIEnv, dirent: Vec<OsString>) -> jo
 
     for (i, dirent) in dirent.iter_mut().enumerate() {
         let dirent = env.new_string(dirent.to_string_lossy()).unwrap();
-        let _ = env.set_object_array_element(object_array, i.try_into().unwrap(), dirent);
+        let _ = env.set_object_array_element(&object_array, i.try_into().unwrap(), dirent);
     }
 
-    object_array
+    object_array.into_raw()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeDispose(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeDispose(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -69,7 +68,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeName(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeName(
     env: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -83,7 +82,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsBlockDevice(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsBlockDevice(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -97,7 +96,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsCharacterDevice(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsCharacterDevice(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -111,7 +110,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsDirectory(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsDirectory(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -125,7 +124,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsFifo(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsFifo(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -139,7 +138,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsFile(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsFile(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -153,7 +152,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsSocket(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsSocket(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,
@@ -167,7 +166,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDirent_nativeIsSymbolicLink(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDirent_nativeIsSymbolicLink(
     _: JNIEnv,
     _: JClass,
     file_dirent: jlong,

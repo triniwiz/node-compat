@@ -1,18 +1,17 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc};
 
 use jni::objects::{JClass, JObject, JString};
 use jni::sys::{jboolean, jlong, jobject, JNI_TRUE};
 use jni::JNIEnv;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-
-use crate::android::fs::file_stat::build_stat_op;
-use crate::android::prelude::*;
-use crate::android::{FILE_WATCHER_CLASS, FILE_WATCHER_EVENT_CLASS, JVM};
 use node_fs::a_sync::{AsyncClosure, FileWatchEvent};
+use crate::fs::a_sync::AsyncCallback;
+use crate::fs::{FILE_WATCHER_CLASS, FILE_WATCHER_EVENT_CLASS, JVM};
+use crate::fs::file_stat::build_stat_op;
+use crate::fs::prelude::*;
 
-use crate::a_sync::AsyncCallback;
 
 type FileWatcherCallbackMap = Arc<Mutex<HashMap<Arc<AsyncCallback>, FileWatcherCallback>>>;
 
@@ -30,27 +29,28 @@ fn build_watch_file<'a>(env: &mut JNIEnv<'a>, file_name: &str, callback: jlong) 
     let clazz = find_class(FILE_WATCHER_CLASS).unwrap();
     let object = env.new_object(clazz, "()V", &[]).unwrap();
     let _ = env.set_field(
-        object,
+        &object,
         "fileName",
         "Ljava/lang/String;",
         env.new_string(file_name).unwrap().into(),
     );
-    let _ = env.set_field(object, "callback", "J", callback.into());
+    let _ = env.set_field(&object, "callback", "J", callback.into());
     object
 }
-fn build_file_watch_event<'a>(env: &JNIEnv<'a>, event: FileWatchEvent) -> JObject<'a> {
+
+fn build_file_watch_event<'a>(env: &mut JNIEnv<'a>, event: FileWatchEvent) -> JObject<'a> {
     let clazz = find_class(FILE_WATCHER_EVENT_CLASS).unwrap();
     let object = env.new_object(clazz, "()V", &[]).unwrap();
     let current = build_stat_op(env, event.current);
     let previous = build_stat_op(env, event.previous);
     let _ = env.set_field(
-        object,
+        &object,
         "previous",
         "Lorg/nativescript/widgets/filesystem/FileStat;",
         previous.into(),
     );
     let _ = env.set_field(
-        object,
+        &object,
         "current",
         "Lorg/nativescript/widgets/filesystem/FileStat;",
         current.into(),
@@ -60,7 +60,7 @@ fn build_file_watch_event<'a>(env: &JNIEnv<'a>, event: FileWatchEvent) -> JObjec
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWatchFile(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     bigint: jboolean,
@@ -77,13 +77,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
         inner: Arc::new(AsyncClosure {
             callback: Box::new(move |event, error| {
                 let jvm = JVM.get().unwrap();
-                let env = jvm.attach_current_thread().unwrap();
+                let mut env = jvm.attach_current_thread().unwrap();
                 if error.is_some() {
                     on_success.on_error(jni::objects::JValue::Object(
                         error_to_jstring(error.unwrap()).as_obj(),
                     ))
                 } else {
-                    on_success.on_success(build_file_watch_event(&env, event.unwrap()).into())
+                    on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
                 }
             }),
         }),
@@ -102,7 +102,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
         inner,
     );
 
-    build_watch_file(&env, path.as_ref(), cb).into_inner()
+    build_watch_file(&mut env, path.as_ref(), cb).into_inner()
 }
 
 #[no_mangle]
@@ -144,13 +144,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileWatchEvent_n
     let inner = Arc::new(AsyncClosure {
         callback: Box::new(move |event: Option<FileWatchEvent>, error| {
             let jvm = JVM.get().unwrap();
-            let env = jvm.attach_current_thread().unwrap();
+            let mut env = jvm.attach_current_thread().unwrap();
             if error.is_some() {
                 on_success.on_error(jni::objects::JValue::Object(
                     error_to_jstring(error.unwrap()).as_obj(),
                 ))
             } else {
-                on_success.on_success(build_file_watch_event(&env, event.unwrap()).into())
+                on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
             }
         }),
     });

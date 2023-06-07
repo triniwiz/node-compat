@@ -2,11 +2,8 @@ use jni::objects::{GlobalRef, JClass, JObject, JString};
 use jni::sys::{jboolean};
 use jni::JNIEnv;
 use libc::{c_double, c_float, c_int};
+use crate::fs::{BOOLEAN_CLASS, DOUBLE_CLASS, FLOAT_CLASS, INTEGER_CLASS, JVM, JVM_CLASS_CACHE, LONG_CLASS};
 
-
-use crate::android::{
-    BOOLEAN_CLASS, DOUBLE_CLASS, FLOAT_CLASS, INTEGER_CLASS, JVM, JVM_CLASS_CACHE, LONG_CLASS,
-};
 
 pub fn find_class(name: &str) -> Option<JClass> {
     JVM_CLASS_CACHE.get().map_or(None, |c| {
@@ -52,8 +49,8 @@ pub fn error_to_jstring(val: std::io::Error) -> GlobalRef {
 
 pub fn get_str(string: JString, default: &str) -> String {
     let vm = JVM.get().unwrap();
-    let env = vm.attach_current_thread().unwrap();
-    env.get_string(string)
+    let mut env = vm.attach_current_thread().unwrap();
+    env.get_string(&string)
         .map_or(default.to_string(), |v| v.to_string_lossy().to_string())
 }
 

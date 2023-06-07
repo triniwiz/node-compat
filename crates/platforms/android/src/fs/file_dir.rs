@@ -1,11 +1,11 @@
+use std::io::Error;
 use jni::objects::{JClass, JObject};
 use jni::sys::jlong;
 use jni::{sys::jobject, JNIEnv};
-
-use crate::android::prelude::*;
-use crate::android::FILE_DIR_CLASS;
-use crate::android::JVM;
 use node_fs::file_dir::FileDir;
+use crate::fs::{FILE_DIR_CLASS, JVM};
+use crate::fs::prelude::*;
+
 
 use super::a_sync::AsyncCallback;
 use super::file_dirent::build_dirent;
@@ -18,7 +18,7 @@ pub(crate) fn build_dir<'a>(env: &mut JNIEnv<'a>, dir: FileDir) -> JObject<'a> {
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeCloseSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativeCloseSync(
     mut env: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -34,7 +34,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeCl
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeClose(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativeClose(
     _: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -46,19 +46,22 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeCl
     if !dir.is_null() {
         let dir = unsafe { Box::from_raw(dir) };
         dir.close_async(Box::new(move |error| {
-            if let Some(error) = error {
-                on_success.on_error(jni::objects::JValue::Object(
-                    error_to_jstring(error).as_obj(),
-                ))
-            } else {
-                on_success.on_success(jni::objects::JObject::null().into())
+            match error {
+                None => {
+                    on_success.on_success(JObject::null().into())
+                }
+                Some(error) => {
+                    on_success.on_error(jni::objects::JValue::Object(
+                        error_to_jstring(error).as_obj(),
+                    ))
+                }
             }
         }));
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativePath(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativePath(
     env: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -72,7 +75,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativePa
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeDispose(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativeDispose(
     _env: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -84,7 +87,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeDi
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeReadSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativeReadSync(
     mut env: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -94,7 +97,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeRe
         let dir = unsafe { Box::from_raw(dir) };
         match dir.read() {
             Ok(dirent) => {
-                return build_dirent(&env, dirent).into_inner();
+                return build_dirent(&mut env, dirent).into_inner();
             }
             Err(error) => {
                 let _ = env.throw(error.to_string());
@@ -105,7 +108,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeRe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeRead(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileDir_nativeRead(
     _: JNIEnv,
     _: JClass,
     file_dir: jlong,
@@ -123,8 +126,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileDir_nativeRe
                 ))
             } else {
                 let jvm = JVM.get().unwrap();
-                let env = jvm.attach_current_thread().unwrap();
-                on_success.on_success(build_dirent(&env, dirent.unwrap()).into())
+                let mut env = jvm.attach_current_thread().unwrap();
+                on_success.on_success(build_dirent(&mut env, dirent.unwrap()).into())
             }
         }));
     }
