@@ -5,20 +5,21 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 use jni::objects::{JClass, JObject, JString};
-use jni::sys::{jboolean, jlong, jobject, JNI_TRUE};
+use jni::sys::{jboolean, jlong, jobject, JNI_TRUE, jint};
 use jni::JNIEnv;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use node_fs::a_sync::{AsyncClosure, WatchEvent};
+use node_fs::a_sync::{AsyncClosure, close, WatchEvent};
+use node_fs::prelude::FsEncodingType;
 use crate::fs::a_sync::AsyncCallback;
 use crate::fs::{FILE_FS_WATCH_CLASS, FILE_FS_WATCH_EVENT_CLASS, JVM};
 use crate::fs::prelude::*;
 
-type WatcherCallbackMap = Arc<Mutex<HashMap<Arc<AsyncCallback>, FsWatchCallback>>>;
+type WatcherCallbackMap = Arc<Mutex<HashMap<AsyncCallback, FsWatchCallback>>>;
 
 #[allow(dead_code)]
 pub struct FsWatchCallback {
-    callback: Arc<AsyncCallback>,
+    callback: AsyncCallback,
     inner: Arc<AsyncClosure<WatchEvent, std::io::Error>>,
 }
 
@@ -67,51 +68,62 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWa
     path: JString,
     persistent: jboolean,
     recursive: jboolean,
-    encoding: JString,
+    encoding: jint,
     callback: jlong,
 ) -> jobject {
     let cb = callback;
     let callback = callback as *const AsyncCallback;
     let callback = AsyncCallback::clone_from_ptr(callback);
-    let on_success = Arc::clone(&callback);
 
-    let item = FsWatchCallback {
-        callback: Arc::clone(&callback),
-        inner: Arc::new(AsyncClosure {
-            callback: Box::new(move |event, error| {
-                let jvm = JVM.get().unwrap();
-                let mut env = jvm.attach_current_thread().unwrap();
-                if error.is_some() {
-                    on_success.on_error(jni::objects::JValue::Object(
-                        error_to_jstring(error.unwrap()).as_obj(),
-                    ))
-                } else {
-                    on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
-                }
-            }),
-        }),
-    };
+    match FsEncodingType::try_from(encoding) {
+        Ok(encoding) => {
+            let on_success = callback.clone();
 
-    let inner = Arc::clone(&item.inner);
-    // call on another thread ?
-    let mut map = watcher_callback_map().lock();
-    let _ = map.insert(callback, item);
+            let item = FsWatchCallback {
+                callback: callback.clone(),
+                inner: Arc::new(AsyncClosure {
+                    callback: Box::new(move |event, error| {
+                        let jvm = JVM.get().unwrap();
+                        let mut env = jvm.attach_current_thread().unwrap();
+                        if error.is_some() {
+                            on_success.on_error(jni::objects::JValue::Object(
+                                error_to_jstring(error.unwrap()).as_obj(),
+                            ))
+                        } else {
+                            on_success.on_success(build_file_watch_event(&mut env, event.unwrap()).into())
+                        }
+                    }),
+                }),
+            };
 
-    let path = get_str(path, "");
-    node_fs::a_sync::watch(
-        path.as_ref(),
-        persistent == JNI_TRUE,
-        recursive == JNI_TRUE,
-        get_str(encoding, "").as_ref(),
-        inner,
-    );
+
+            let inner = Arc::clone(&item.inner);
+            // call on another thread ?
+            let mut map = watcher_callback_map().lock();
+            let _ = map.insert(callback, item);
+
+            let path = get_str(&mut env, &path, "");
+
+            node_fs::a_sync::watch(
+                path.as_ref(),
+                persistent == JNI_TRUE,
+                recursive == JNI_TRUE,
+                encoding,
+                inner,
+            );
+        }
+        Err(error) => {
+            callback.on_error(env.new_string(error).unwrap().into())
+        }
+    }
+
 
     build_fs_watch(&mut env, path.as_ref(), cb).into_inner()
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUnwatchFile(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     callback: jlong,
@@ -123,13 +135,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUn
 
     if let Some(cb) = map.get(&callback).map(|c| Arc::clone(&c.inner)) {
         map.remove(&callback);
-        node_fs::a_sync::watcher_unref(get_str(path, "").as_ref(), cb);
+        node_fs::a_sync::watcher_unref(get_str(&mut env, &path, "").as_ref(), cb);
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeUnref(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     filename: JString,
     callback: jlong,
@@ -141,13 +153,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeUnr
 
     if let Some(cb) = map.get(&callback).map(|c| Arc::clone(&c.inner)) {
         map.remove(&callback);
-        node_fs::a_sync::watcher_unref(get_str(filename, "").as_ref(), cb);
+        node_fs::a_sync::watcher_unref(get_str(&mut env, &filename, "").as_ref(), cb);
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeRef(
-    _env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     filename: JString,
     callback: jlong,
@@ -176,17 +188,17 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FsWatcher_nativeRef
     })));
 
     let item = FsWatchCallback {
-        callback: Arc::clone(&callback),
+        callback: callback.clone(),
         inner: Arc::clone(&inner),
     };
 
     map.insert(callback, item);
-    node_fs::a_sync::watcher_ref(get_str(filename, "").as_ref(), inner);
+    node_fs::a_sync::watcher_ref(get_str(&mut env, &filename, "").as_ref(), inner);
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_WatcherEvent_nativeClose(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     filename: JString,
     callback: jlong,
@@ -209,6 +221,6 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_WatcherEvent_native
             }
         }))
             .into_arc();
-        node_fs::a_sync::watcher_close(get_str(filename, "").as_ref(), item, close_callback);
+        node_fs::a_sync::watcher_close(get_str(&mut env, &filename, "").as_ref(), item, close_callback);
     }
 }

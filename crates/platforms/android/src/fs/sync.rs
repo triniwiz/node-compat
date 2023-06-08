@@ -1,12 +1,14 @@
-use jni::objects::{JByteBuffer, JClass, JObject, JString, JValue, ReleaseMode};
-use jni::sys::{jboolean, jbyteArray, jint, jlong, jobject, jobjectArray, JNI_TRUE};
+use jni::objects::{JByteArray, JByteBuffer, JClass, JLongArray, JObject, JString, JValue, ReleaseMode};
+use jni::sys::{jboolean, jbyteArray, jint, jlong, jobject, jobjectArray, JNI_TRUE, jarray, jsize, jstring};
 use jni::JNIEnv;
 use libc::{c_int, c_uint, c_ushort};
-use node_fs::prelude::handle_meta;
+use node_buffer::{Buffer, StringEncoding};
+use node_fs::prelude::{FsEncoding, FsEncodingType, handle_meta};
+use node_fs::sync::ReaddirResult;
 use crate::fs::file_dir::build_dir;
-use crate::fs::file_dirent::{build_dirents, build_dirents_paths};
+use crate::fs::file_dirent::{build_dirent, build_dirents, build_dirents_paths};
 use crate::fs::file_stat::build_stat;
-use crate::fs::FILE_SYSTEM_CLASS;
+use crate::fs::{FILE_DIRENT_CLASS, FILE_SYSTEM_CLASS, STRING_CLASS};
 use crate::fs::prelude::*;
 
 #[no_mangle]
@@ -16,8 +18,24 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAc
     path: JString,
     mode: jint,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::access(&path, mode);
+    if let Err(error) = result {
+        let _ = env.throw(error.to_string());
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAppendFileSync(
+    mut env: JNIEnv,
+    _: JClass,
+    fd: jint,
+    buffer: jlong,
+) {
+    let data = unsafe { &*(buffer as *mut Buffer) };
+
+    let result = node_fs::sync::append_file_with_buffer(fd, data);
+
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
     }
@@ -28,15 +46,18 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAp
     mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    bytes: jbyteArray,
+    bytes: JByteArray,
 ) {
-    let data = env
-        .get_primitive_array_critical(bytes, ReleaseMode::NoCopyBack)
-        .unwrap();
+    let data = unsafe {
+        env
+            .get_array_elements_critical(&bytes, ReleaseMode::NoCopyBack)
+            .unwrap()
+    };
+
     let bytes = unsafe {
         std::slice::from_raw_parts_mut(
             data.as_ptr() as *mut u8,
-            data.size().unwrap_or_default() as usize,
+            data.len() as usize,
         )
     };
     let result = node_fs::sync::append_file_with_bytes(fd, bytes);
@@ -54,7 +75,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAp
     fd: jint,
     data: JString,
 ) {
-    let data = get_str(data, "");
+    let data = get_str(&mut env, &data, "");
     let result = node_fs::sync::append_file_with_str(fd, &data);
 
     if let Err(error) = result {
@@ -67,23 +88,28 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAp
     mut env: JNIEnv,
     _: JClass,
     path: JString,
-    bytes: jbyteArray,
+    bytes: JByteArray,
     mode: jint,
     flags: jint,
 ) {
-    let path = get_str(path, "");
-    let data = env
-        .get_primitive_array_critical(bytes, ReleaseMode::NoCopyBack)
-        .unwrap();
+    let path = get_str(&mut env, &path, "");
+    let bytes = unsafe {
+        env
+            .get_array_elements_critical(&bytes, ReleaseMode::NoCopyBack)
+            .unwrap()
+    };
+
     let data = unsafe {
         std::slice::from_raw_parts_mut(
             data.as_ptr() as *mut u8,
             data.size().unwrap_or_default() as usize,
         )
     };
+
     let result = node_fs::sync::append_file_with_path_bytes(&path, data, mode, flags);
 
     if let Err(error) = result {
+        drop(bytes);
         let _ = env.throw(error.to_string());
     }
 }
@@ -97,8 +123,8 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeAp
     mode: jint,
     flags: jint,
 ) {
-    let path = get_str(path, "");
-    let data = get_str(data, "");
+    let path = get_str(&mut env, &path, "");
+    let data = get_str(&mut env, &data, "");
     let result = node_fs::sync::append_file_with_path_str(path.as_ref(), data.as_ref(), mode, flags);
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -112,7 +138,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCh
     path: JString,
     mode: jint,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::chmod(path.as_ref(), mode as u32);
 
     if let Err(error) = result {
@@ -128,7 +154,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCh
     uid: jint,
     gid: jint,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::chown(path.as_ref(), uid as u32, gid as u32);
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -152,8 +178,8 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCo
     dest: JString,
     flags: jint,
 ) {
-    let src = get_str(src, "");
-    let dest = get_str(dest, "");
+    let src = get_str(&mut env, &src, "");
+    let dest = get_str(&mut env, &dest, "");
     let result = node_fs::sync::copy_file(&src, &dest, flags as u32);
 
     if let Err(error) = result {
@@ -163,24 +189,24 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCo
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeCopySync(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     src: JString,
     dest: JString,
     _flags: jint,
 ) {
-    let _src = get_str(src, "");
-    let _dest = get_str(dest, "");
+    let _src = get_str(&mut env, &src, "");
+    let _dest = get_str(&mut env, &dest, "");
     todo!()
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeExistsSync(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     src: JString,
 ) -> jboolean {
-    let src = get_str(src, "");
+    let src = get_str(&mut env, &src, "");
     node_fs::sync::exists(&src).into()
 }
 
@@ -284,7 +310,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLc
     path: JString,
     mode: jint,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::lchmod(&path, mode as c_ushort);
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -299,7 +325,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLc
     uid: jint,
     gid: jint,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::lchown(&path, uid as c_uint, gid as c_uint);
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -314,7 +340,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLu
     atime: jlong,
     mtime: jlong,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::lutimes(&path, atime.try_into().unwrap(), mtime.try_into().unwrap());
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -328,8 +354,8 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLi
     existing_path: JString,
     new_path: JString,
 ) {
-    let existing_path = get_str(existing_path, "");
-    let new_path = get_str(new_path, "");
+    let existing_path = get_str(&mut env, &existing_path, "");
+    let new_path = get_str(&mut env, &new_path, "");
     let result = node_fs::sync::link(&existing_path, &new_path);
 
     if let Err(error) = result {
@@ -343,7 +369,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeLs
     _: JClass,
     path: JString,
 ) -> jobject {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     match node_fs::sync::lstat(&path) {
         Ok(stat) => build_stat(&mut env, handle_meta(&stat)).into_inner(),
         Err(error) => {
@@ -361,7 +387,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeMk
     mode: c_int,
     recursive: jboolean,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::mkdir(&path, mode as u32, recursive == JNI_TRUE);
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -374,7 +400,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeMk
     _: JClass,
     prefix: JString,
 ) -> jobject {
-    let prefix = get_str(prefix, "");
+    let prefix = get_str(&mut env, &prefix, "");
     return match node_fs::sync::mkdtemp(&prefix) {
         Ok(result) => env.new_string(result).unwrap().into_inner(),
         Err(error) => {
@@ -392,7 +418,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeOp
     flags: jint,
     mode: jint,
 ) -> jint {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     match node_fs::sync::open(&path, flags, mode) {
         Ok(fd) => fd.into(),
         Err(error) => {
@@ -408,7 +434,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeOp
     _: JClass,
     path: JString,
 ) -> jobject {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     return match node_fs::sync::opendir(&path) {
         Ok(dir) => build_dir(&mut env, dir).into_inner(),
         Err(error) => {
@@ -420,6 +446,75 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeOp
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadSync(
+    mut env: JNIEnv,
+    _: JClass,
+    fd: jint,
+    buffer: jlong,
+    offset: jlong,
+    length: jlong,
+    position: jlong,
+) -> jlong {
+    let buffer = unsafe { &mut *(buffer as *mut Buffer) };
+    return match node_fs::sync::read(
+        fd,
+        buffer.buffer_mut(),
+        offset.try_into().unwrap(),
+        length.try_into().unwrap(),
+        position.try_into().unwrap(),
+    ) {
+        Ok(read) => (read as jlong).into(),
+        Err(error) => {
+            let _ = env.throw(error.to_string());
+            0
+        }
+    };
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadWithBytesSync(
+    mut env: JNIEnv,
+    _: JClass,
+    fd: jint,
+    buffer: JByteArray,
+    offset: jlong,
+    length: jlong,
+    position: jlong,
+) -> jlong {
+    let data = unsafe {
+        env
+            .get_array_elements_critical(&buffer, ReleaseMode::CopyBack)
+            .unwrap()
+    };
+
+    let bytes = unsafe {
+        std::slice::from_raw_parts_mut(
+            data.as_ptr() as *mut u8,
+            data.len(),
+        )
+    };
+    match node_fs::sync::read(
+        fd,
+        bytes,
+        offset.try_into().unwrap(),
+        length.try_into().unwrap(),
+        position.try_into().unwrap(),
+    ) {
+        Ok(read) => {
+            // force drop of array to enable jni usage
+            drop(data);
+            read as jlong
+        }
+        Err(error) => {
+            // force drop of array to enable jni usage
+            drop(data);
+            let _ = env.throw(error.to_string());
+            0
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadWithBufferSync(
     mut env: JNIEnv,
     _: JClass,
     fd: jint,
@@ -450,126 +545,139 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadWithBytesSync(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReaddir(
     mut env: JNIEnv,
     _: JClass,
-    fd: jint,
-    buffer: jbyteArray,
-    offset: jlong,
-    length: jlong,
-    position: jlong,
-) -> jlong {
-    let data = env
-        .get_primitive_array_critical(buffer, ReleaseMode::NoCopyBack)
-        .unwrap();
-    let bytes = unsafe {
-        std::slice::from_raw_parts_mut(
-            data.as_ptr() as *mut u8,
-            data.size().unwrap_or_default() as usize,
-        )
-    };
-    match node_fs::sync::read(
-        fd,
-        bytes,
-        offset.try_into().unwrap(),
-        length.try_into().unwrap(),
-        position.try_into().unwrap(),
-    ) {
-        Ok(read) => {
-            // force drop of array to enable jni usage
-            drop(data);
-            read as jlong
+    path: JString,
+    with_file_types: jboolean,
+    encoding: jint,
+) -> jarray {
+    match FsEncodingType::try_from(encoding) {
+        Ok(encoding) => {
+            let path = get_str(&mut env, &path, "");
+            match node_fs::sync::readdir(&path, with_file_types == JNI_TRUE, encoding) {
+                Ok(success) => {
+                    if with_file_types {
+                        let dirent = find_class(FILE_DIRENT_CLASS).unwrap();
+                        let array = env.new_object_array(
+                            success.len() as jsize,
+                            dirent,
+                            JObject::null(),
+                        ).unwrap();
+
+                        for (i, result) in success.into_iter().enumerate() {
+                            let dirent = match result {
+                                ReaddirResult::Type(result) => {
+                                    build_dirent(&mut env, result)
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            };
+                            let _ = env.set_object_array_element(&array, i as jsize, dirent);
+                        }
+
+                        return array.into_raw();
+                    }
+
+                    return match encoding {
+                        FsEncodingType::Utf8 | FsEncodingType::Utf16le | FsEncodingType::Ucs2 | FsEncodingType::Latin1 | FsEncodingType::Ascii => {
+                            let string = find_class(STRING_CLASS).unwrap();
+                            let array = env.new_object_array(
+                                success.len() as jsize,
+                                string,
+                                JObject::null(),
+                            ).unwrap();
+
+                            for (i, result) in success.iter().enumerate() {
+                                let result = match result {
+                                    ReaddirResult::String(result) => {
+                                        env.new_string(result).unwrap()
+                                    }
+                                    _ => {
+                                        unreachable!()
+                                    }
+                                };
+
+                                let _ = env.set_object_array_element(&array, i as jsize, result);
+                            }
+
+                            array.into_raw()
+                        }
+
+                        FsEncodingType::Buffer => {
+                            let array = env.new_long_array(
+                                success.len() as jsize,
+                            ).unwrap();
+
+                            let result = success.into_iter()
+                                .map(|result| {
+                                    match result {
+                                        ReaddirResult::Buffer(result) => {
+                                            Box::into_raw(
+                                                Box::new(result)
+                                            ) as jlong
+                                        }
+                                        _ => {
+                                            unreachable!()
+                                        }
+                                    }
+                                })
+                                .collect::<Vec<jlong>>();
+
+                            let _ = env.set_long_array_region(&array, i as jsize, result.as_slice());
+
+                            array.into_raw()
+                        }
+                    };
+                }
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    build_dirents(&mut env, vec![])
+                }
+            }
         }
         Err(error) => {
-            // force drop of array to enable jni usage
-            drop(data);
-            let _ = env.throw(error.to_string());
-            0
+            let _ = env.throw(error);
         }
     }
 }
 
-#[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReaddirWithFileTypesSync(
-    mut env: JNIEnv,
-    _: JClass,
-    path: JString,
-    encoding: JString,
-) -> jobjectArray {
-    let path = get_str(path, "");
-    let encoding = get_str(encoding, "");
-    match node_fs::sync::readdir_with_file_types(&path, &encoding) {
-        Ok(dirent) => build_dirents(&mut env, dirent),
-        Err(error) => {
-            let _ = env.throw(error.to_string());
-            build_dirents(&mut env, vec![])
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReaddirWithFileSync(
-    mut env: JNIEnv,
-    _: JClass,
-    path: JString,
-    encoding: JString,
-) -> jobjectArray {
-    let path = get_str(path, "");
-    let encoding = get_str(encoding, "");
-    match node_fs::sync::readdir_with_file(&path, &encoding) {
-        Ok(dir) => build_dirents_paths(&mut env, dir).into(),
-        Err(error) => {
-            let _ = env.throw(error.to_string());
-            build_dirents_paths(&mut env, vec![]).into()
-        }
-    }
-}
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileSync(
     mut env: JNIEnv,
     _: JClass,
     path: JString,
+    encoding: jint,
     flags: jint,
 ) -> jobject {
-    read_file(env, path, flags, false)
-}
-
-#[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileBytesSync(
-    mut env: JNIEnv,
-    _: JClass,
-    path: JString,
-    flags: jint,
-) -> jobject {
-    read_file(env, path, flags, true)
-}
-
-fn read_file(mut env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> jobject {
-    let path = get_str(path, "");
-    match node_fs::sync::read_file(&path, flags) {
-        Ok(mut buf) => {
-            if to_bytes {
-                env.byte_array_from_slice(buf.as_mut_slice())
-                    .unwrap()
-                    .into()
-            } else {
-                let db = unsafe { env.new_direct_byte_buffer(buf.as_mut_slice(), buf.length()).unwrap() };
-                let buf = Box::into_raw(Box::new(buf));
-                let clazz = find_class(FILE_SYSTEM_CLASS).unwrap();
-                let db: JValue = db.into();
-                env.call_static_method(
-                    clazz,
-                    "watchItem",
-                    "(JLjava/nio/ByteBuffer;)V",
-                    &[(buf as i64).into(), db],
-                )
-                    .unwrap();
-                db.l().unwrap().into_inner()
+    let path = get_str(&mut env, &path, "");
+    match FsEncodingType::try_from(encoding) {
+        Ok(encoding) => {
+            match node_fs::sync::read_file(&path, encoding, flags) {
+                Ok(mut buf) => {
+                    match buf {
+                        FsEncoding::String(string) => {
+                            env.new_string(string.to_string_lossy()).unwrap().into_raw()
+                        }
+                        FsEncoding::Buffer(buffer) => {
+                            return JValue::Long(Box::into_raw(
+                                Box::new(
+                                    buffer
+                                )
+                            ) as jlong).into();
+                        }
+                    }
+                }
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    JObject::null().into_inner()
+                }
             }
         }
         Err(error) => {
-            let _ = env.throw(error.to_string());
+            let _ = env.throw(error);
             JObject::null().into_inner()
         }
     }
@@ -577,45 +685,37 @@ fn read_file(mut env: JNIEnv, path: JString, flags: jint, to_bytes: bool) -> job
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileWithFdSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
+    encoding: jint,
     flags: jint,
 ) -> jobject {
-    read_file_with_fd(env, fd, flags, false)
-}
-
-#[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadFileBytesWithFdSync(
-    env: JNIEnv,
-    _: JClass,
-    fd: jint,
-    flags: jint,
-) -> jobject {
-    read_file_with_fd(env, fd, flags, true)
-}
-
-fn read_file_with_fd(env: JNIEnv, fd: jint, flags: jint, to_bytes: bool) -> jobject {
-    match node_fs::sync::read_file_with_fd(fd, flags) {
-        Ok(mut buf) => {
-            if to_bytes {
-                env.byte_array_from_slice(buf.as_mut_slice()).unwrap()
-            } else {
-                let db = env.new_direct_byte_buffer(buf.as_mut_slice()).unwrap();
-                let buf = Box::into_raw(Box::new(buf));
-                let clazz = find_class(FILE_SYSTEM_CLASS).unwrap();
-                let db: JValue = db.into();
-                let _ = env.call_static_method(
-                    clazz,
-                    "watchItem",
-                    "(JLjava/nio/ByteBuffer)V",
-                    &[(buf as i64).into(), db],
-                );
-                db.l().unwrap().into_inner()
+    match FsEncodingType::try_from(encoding) {
+        Ok(encoding) => {
+            match node_fs::sync::read_file_with_fd(fd, encoding, flags) {
+                Ok(mut buf) => {
+                    match buf {
+                        FsEncoding::String(string) => {
+                            env.new_string(string.to_string_lossy()).unwrap().into_raw()
+                        }
+                        FsEncoding::Buffer(buffer) => {
+                            return JValue::Long(Box::into_raw(
+                                Box::new(
+                                    buffer
+                                )
+                            ) as jlong).into();
+                        }
+                    }
+                }
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    JObject::null().into_inner()
+                }
             }
         }
         Err(error) => {
-            let _ = env.throw(error.to_string());
+            let _ = env.throw(error);
             JObject::null().into_inner()
         }
     }
@@ -623,17 +723,37 @@ fn read_file_with_fd(env: JNIEnv, fd: jint, flags: jint, to_bytes: bool) -> jobj
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadLinkSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
-    encoding: JString,
+    encoding: jint,
 ) -> jobject {
-    let path = get_str(path, "");
-    let encoding = get_str(encoding, "");
-    match node_fs::sync::read_link(&path, &encoding) {
-        Ok(link) => env.new_string(link.to_string_lossy()).unwrap().into_inner(),
+    match FsEncodingType::try_from(encoding) {
+        Ok(encoding) => {
+            let path = get_str(&mut env, &path, "");
+            match node_fs::sync::read_link(&path, encoding) {
+                Ok(link) => {
+                    match link {
+                        FsEncoding::String(string) => {
+                            env.new_string(string.to_string_lossy()).unwrap().into_raw()
+                        }
+                        FsEncoding::Buffer(buffer) => {
+                            return JValue::Long(Box::into_raw(
+                                Box::new(
+                                    buffer
+                                )
+                            ) as jlong).into();
+                        }
+                    }
+                }
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    JObject::null().into_inner()
+                }
+            }
+        }
         Err(error) => {
-            let _ = env.throw(error.to_string());
+            let _ = env.throw(error);
             JObject::null().into_inner()
         }
     }
@@ -641,21 +761,28 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRe
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeReadvSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    buffers: jobjectArray,
+    buffers: JLongArray,
     position: jlong,
 ) -> jlong {
-    let size = env.get_array_length(buffers).unwrap_or_default();
-    let mut buf = Vec::<ByteBufMut>::with_capacity(size.try_into().unwrap());
-    for i in 0..size {
-        let bytebuf = JByteBuffer::from(env.get_object_array_element(buffers, i).unwrap());
-        let address = env.get_direct_buffer_address(bytebuf).unwrap();
-        buf.push(ByteBufMut::new(address.as_mut_ptr(), address.len()))
-    }
-    match node_fs::sync::readv(fd, buf.as_mut_slice(), position.try_into().unwrap()) {
-        Ok(read) => read as jlong,
+    match unsafe { env.get_array_elements_critical(&buffers, ReleaseMode::CopyBack) } {
+        Ok(array) => {
+            let array = unsafe { std::slice::from_raw_parts_mut(array.as_ptr() as *mut i64, array.len()) };
+
+            let mut buf = array.iter()
+                .map(|value| unsafe { (&*(*i as *mut Buffer)).clone() })
+                .collect::<Vec<Buffer>>();
+
+            match node_fs::sync::readv(fd, buf.as_mut_slice(), position.try_into().unwrap()) {
+                Ok(read) => read as jlong,
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    0
+                }
+            }
+        }
         Err(error) => {
             let _ = env.throw(error.to_string());
             0
@@ -665,11 +792,11 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRe
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRealPathSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
 ) -> jobject {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     match node_fs::sync::real_path(&path) {
         Ok(buf) => env.new_string(buf.to_string_lossy()).unwrap().into_inner(),
         Err(error) => {
@@ -681,13 +808,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRe
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRenameSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     old_path: JString,
     new_path: JString,
 ) {
-    let old_path = get_str(old_path, "");
-    let new_path = get_str(new_path, "");
+    let old_path = get_str(&mut env, &old_path, "");
+    let new_path = get_str(&mut env, &new_path, "");
     let result = node_fs::sync::rename(&old_path, &new_path);
 
     if let Err(error) = result {
@@ -697,14 +824,14 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRe
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRmdirSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     max_retries: jint,
     recursive: jboolean,
     retry_delay: jlong,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::rmdir(
         &path,
         max_retries,
@@ -718,14 +845,14 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRm
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRmSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     max_retries: jint,
     recursive: jboolean,
     retry_delay: jlong,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::rm(
         &path,
         max_retries,
@@ -740,15 +867,15 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeRm
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeStatSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     throw_if_no_entry: jboolean,
 ) -> jobject {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let meta = node_fs::sync::stat(&path);
     match meta {
-        Ok(stat) => build_stat(&env, handle_meta(&stat)).into_inner(),
+        Ok(stat) => build_stat(&mut env, handle_meta(&stat)).into_inner(),
         Err(error) => {
             if throw_if_no_entry == JNI_TRUE && error.kind() == std::io::ErrorKind::NotFound {
                 let _ = env.throw(error.to_string());
@@ -760,15 +887,15 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeSt
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeSymlinkSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     target: JString,
     path: JString,
     type_: JString,
 ) {
-    let target = get_str(target, "");
-    let path = get_str(path, "");
-    let type_ = get_str(type_, "");
+    let target = get_str(&mut env, &target, "");
+    let path = get_str(&mut env, &path, "");
+    let type_ = get_str(&mut env, &type_, "");
     let result = node_fs::sync::symlink(&target, &path, &type_);
 
     if let Err(error) = result {
@@ -778,12 +905,12 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeSy
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeTruncateSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     len: jlong,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::truncate(&path, len.try_into().unwrap());
 
     if let Err(error) = result {
@@ -793,11 +920,11 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeTr
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUnlinkSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::unlink(&path);
 
     if let Err(error) = result {
@@ -809,13 +936,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUn
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUtimesSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     atime: jlong,
     mtime: jlong,
 ) {
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     let result = node_fs::sync::utimes(&path, atime.try_into().unwrap(), mtime.try_into().unwrap());
 
     if let Err(error) = result {
@@ -825,18 +952,18 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeUt
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    buffer: JByteBuffer,
+    buffer: jlong,
     offset: jlong,
     length: jlong,
     position: jlong,
 ) -> jlong {
-    let bytes = env.get_direct_buffer_address(buffer).unwrap();
+    let buffer = unsafe { &mut *(buffer as *mut Buffer) };
     match node_fs::sync::write(
         fd,
-        bytes,
+        buffer.buffer_mut(),
         offset.try_into().unwrap(),
         length.try_into().unwrap(),
         position.try_into().unwrap(),
@@ -850,22 +977,61 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWr
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteBufferSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    buffer: jbyteArray,
+    buffer: JByteBuffer,
     offset: jlong,
     length: jlong,
     position: jlong,
 ) -> jlong {
-    let data = env
-        .get_primitive_array_critical(buffer, ReleaseMode::NoCopyBack)
-        .unwrap();
+    match (env.get_direct_buffer_address(&buffer), env.get_direct_buffer_capacity(&buffer)) {
+        (Ok(data), Ok(size)) => {
+            let bytes = unsafe { std::slice::from_raw_parts_mut(data, size) };
+            match node_fs::sync::write(
+                fd,
+                bytes,
+                offset.try_into().unwrap(),
+                length.try_into().unwrap(),
+                position.try_into().unwrap(),
+            ) {
+                Ok(wrote) => wrote as jlong,
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    0
+                }
+            }
+        }
+        (Err(error), _) => {
+            let _ = env.throw(error.to_string());
+            0
+        }
+        _ => { 0 }
+    }
+}
+
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteBytesSync(
+    mut env: JNIEnv,
+    _: JClass,
+    fd: jint,
+    data: JByteArray,
+    offset: jlong,
+    length: jlong,
+    position: jlong,
+) -> jlong {
+    let data = unsafe {
+        env
+            .get_array_elements_critical(&data, ReleaseMode::NoCopyBack)
+            .unwrap()
+    };
+
     let bytes = unsafe {
         std::slice::from_raw_parts_mut(
             data.as_ptr() as *mut u8,
-            data.size().unwrap_or_default() as usize,
+            data.len(),
         )
     };
     match node_fs::sync::write(
@@ -891,35 +1057,43 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWr
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteStringSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     string: JString,
-    encoding: JString,
+    encoding: jint,
     position: jlong,
 ) -> jlong {
-    let string = get_str(string, "");
-    let encoding = get_str(encoding, "");
-    match node_fs::sync::write_string(fd, &string, &encoding, position.try_into().unwrap()) {
-        Ok(wrote) => wrote as jlong,
+    match StringEncoding::try_from(encoding) {
+        Ok(encoding) => {
+            let string = get_str(&mut env, &string, "");
+            match node_fs::sync::write_string(fd, &string, encoding, position.try_into().unwrap()) {
+                Ok(wrote) => wrote as jlong,
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    0
+                }
+            }
+        }
         Err(error) => {
-            let _ = env.throw(error.to_string());
-            0_i64
+            let _ = env.throw(error);
+            0
         }
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithStringSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    data: JString,
-    encoding: JString,
+    buffer: jlong,
 ) {
-    let data = get_str(data, "");
-    let encoding = get_str(encoding, "");
-    let result = node_fs::sync::write_file_with_str(fd, &data, &encoding);
+    let data = unsafe { &*(buffer as *mut Buffer) };
+
+    let bytes = data.buffer();
+
+    let result = node_fs::sync::write_file_with_bytes(fd, bytes);
 
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -927,108 +1101,178 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWr
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBytesSync(
-    env: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithStringSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    data: jbyteArray,
+    data: JString,
+    encoding: jint,
 ) {
-    let data = env
-        .get_primitive_array_critical(data, ReleaseMode::NoCopyBack)
-        .unwrap();
+    match StringEncoding::try_from(encoding) {
+        Ok(encoding) => {
+            let data = get_str(&mut env, &data, "");
+
+            let result = node_fs::sync::write_file_with_str(fd, &data, encoding);
+
+            if let Err(error) = result {
+                let _ = env.throw(error.to_string());
+            }
+        }
+        Err(error) => {
+            let _ = env.throw(error);
+            0
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBytesSync(
+    mut env: JNIEnv,
+    _: JClass,
+    fd: jint,
+    data: JByteArray,
+) {
+    let data = unsafe {
+        env
+            .get_array_elements_critical(&data, ReleaseMode::NoCopyBack)
+            .unwrap()
+    };
+
     let bytes = unsafe {
         std::slice::from_raw_parts_mut(
             data.as_ptr() as *mut u8,
-            data.size().unwrap_or_default() as usize,
+            data.len(),
         )
     };
     let result = node_fs::sync::write_file_with_bytes(fd, bytes);
 
     if let Err(error) = result {
+        drop(data);
         let _ = env.throw(error.to_string());
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBufferSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
     data: JByteBuffer,
 ) {
-    let bytes = env.get_direct_buffer_address(data).unwrap();
-    let result = node_fs::sync::write_file_with_bytes(fd, bytes);
+    match (env.get_direct_buffer_address(&data), env.get_direct_buffer_capacity(&data)) {
+        (Ok(data), Ok(size)) => {
+            let bytes = unsafe { std::slice::from_raw_parts_mut(data, size) };
+            let result = node_fs::sync::write_file_with_bytes(fd, bytes);
 
-    if let Err(error) = result {
-        let _ = env.throw(error.to_string());
+            if let Err(error) = result {
+                let _ = env.throw(error.to_string());
+            }
+        }
+        (Err(error), _) => {
+            let _ = env.throw(error.to_string());
+        }
+        _ => {}
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithStringFromPathSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     data: JString,
-    encoding: JString,
+    encoding: jint,
     mode: c_int,
     flag: c_int,
 ) {
-    let path = get_str(path, "");
-    let data = get_str(data, "");
-    let encoding = get_str(encoding, "");
+    match StringEncoding::try_from(encoding) {
+        Ok(encoding) => {
+            let path = get_str(&mut env, &path, "");
+            let data = get_str(&mut env, &data, "");
 
-    let result = node_fs::sync::write_file_with_str_from_path(&path, &data, &encoding, mode, flag);
+            let result = node_fs::sync::write_file_with_str_from_path(&path, &data, encoding, mode, flag);
 
-    if let Err(error) = result {
-        let _ = env.throw(error.to_string());
+            if let Err(error) = result {
+                let _ = env.throw(error.to_string());
+            }
+        }
+        Err(error) => {
+            let _ = env.throw(error);
+        }
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBytesFromPathSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
-    data: jbyteArray,
-    encoding: JString,
+    data: JByteArray,
     mode: c_int,
     flag: c_int,
 ) {
-    let path = get_str(path, "");
-    let encoding = get_str(encoding, "");
+    let path = get_str(&mut env, &path, "");
 
-    let data = env
-        .get_primitive_array_critical(data, ReleaseMode::NoCopyBack)
-        .unwrap();
+    let data = unsafe {
+        env
+            .get_array_elements_critical(&data, ReleaseMode::NoCopyBack)
+            .unwrap()
+    };
     let bytes = unsafe {
         std::slice::from_raw_parts_mut(
             data.as_ptr() as *mut u8,
-            data.size().unwrap_or_default() as usize,
+            data.len(),
         )
     };
-    let result = node_fs::sync::write_file_with_bytes_from_path(&path, bytes, &encoding, mode, flag);
+    let result = node_fs::sync::write_file_with_bytes_from_path(&path, bytes, mode, flag);
 
     if let Err(error) = result {
+        drop(data);
         let _ = env.throw(error.to_string());
     }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileWithBufferFromPathSync(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     data: JByteBuffer,
-    encoding: JString,
     mode: c_int,
     flag: c_int,
 ) {
-    let path = get_str(path, "");
-    let encoding = get_str(encoding, "");
+    match (env.get_direct_buffer_address(&data), env.get_direct_buffer_capacity(&data)) {
+        (Ok(data), Ok(size)) => {
+            let path = get_str(&mut env, &path, "");
 
-    let bytes = env.get_direct_buffer_address(data).unwrap();
-    let result = node_fs::sync::write_file_with_bytes_from_path(&path, bytes, &encoding, mode, flag);
+            let bytes = unsafe { std::slice::from_raw_parts_mut(data, size) };
+            let result = node_fs::sync::write_file_with_bytes_from_path(&path, bytes, mode, flag);
+
+            if let Err(error) = result {
+                let _ = env.throw(error.to_string());
+            }
+        }
+        (Err(error), _) => {
+            let _ = env.throw(error.to_string());
+        }
+        _ => {}
+    }
+}
+
+
+#[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWriteFileFromPathSync(
+    mut env: JNIEnv,
+    _: JClass,
+    path: JString,
+    data: jlong,
+    mode: c_int,
+    flag: c_int,
+) {
+    let path = get_str(&mut env, &path, "");
+
+    let bytes = unsafe { &*(data as *mut Buffer) };
+    let result = node_fs::sync::write_file_with_buffer_from_path(&path, bytes, mode, flag);
 
     if let Err(error) = result {
         let _ = env.throw(error.to_string());
@@ -1036,22 +1280,31 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWr
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWritevSync(
-    env: JNIEnv,
+pub unsafe extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWritevSync(
+    mut env: JNIEnv,
     _: JClass,
     fd: jint,
-    buffers: jobjectArray,
+    buffers: JLongArray,
     position: jlong,
 ) -> jlong {
-    let size = env.get_array_length(buffers).unwrap_or_default();
-    let mut buf = Vec::<ByteBuf>::with_capacity(size.try_into().unwrap());
-    for i in 0..size {
-        let bytebuf = JByteBuffer::from(env.get_object_array_element(buffers, i).unwrap());
-        let address = env.get_direct_buffer_address(bytebuf).unwrap();
-        buf.push(ByteBuf::new(address.as_ptr(), address.len()))
-    }
-    match node_fs::sync::writev(fd, buf, position.try_into().unwrap()) {
-        Ok(wrote) => wrote as jlong,
+    match env.get_array_elements_critical(&buffers, ReleaseMode::NoCopyBack) {
+        Ok(array) => {
+            let slice = std::slice::from_raw_parts_mut(array.as_ptr(), array.len());
+
+            let slice = slice.iter()
+                .map(|s| &*(*s as *mut Buffer).clone())
+                .collect::<Vec<Buffer>>();
+
+            drop(array);
+
+            match node_fs::sync::writev(fd, slice, position.try_into().unwrap()) {
+                Ok(wrote) => wrote as jlong,
+                Err(error) => {
+                    let _ = env.throw(error.to_string());
+                    0
+                }
+            }
+        }
         Err(error) => {
             let _ = env.throw(error.to_string());
             0

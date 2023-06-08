@@ -3,10 +3,11 @@ use std::os::unix::prelude::*;
 use std::sync::Arc;
 
 use libc::{c_int, c_long, c_uint, c_ushort};
-use node_buffer::Buffer;
+use node_buffer::{Buffer, StringEncoding};
 
 use crate::a_sync::{AsyncClosure};
 use crate::file_stat::FileStat;
+use crate::prelude::{FsEncoding, FsEncodingType};
 use crate::sync::open_handle_with_path_str;
 
 pub struct FileHandle(File);
@@ -47,7 +48,7 @@ impl FileHandle {
 
     pub fn append_file_with_bytes(
         &mut self,
-        data: Buffer,
+        data: &Buffer,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
@@ -100,11 +101,11 @@ impl FileHandle {
     }
     pub fn readFile(
         &mut self,
-        _encoding: &str,
-        callback: Arc<AsyncClosure<Buffer, std::io::Error>>,
+        encoding: FsEncodingType,
+        callback: Arc<AsyncClosure<FsEncoding, std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::read_file_with_fd(fd, 0, callback);
+        crate::a_sync::read_file_with_fd(fd, encoding, 0, callback);
     }
 
     pub fn readv(
@@ -144,7 +145,7 @@ impl FileHandle {
 
     pub fn write(
         &mut self,
-        buffer: Buffer,
+        buffer: &Buffer,
         offset: usize,
         length: usize,
         position: isize,
@@ -157,7 +158,7 @@ impl FileHandle {
     pub fn write_string(
         &mut self,
         data: &str,
-        encoding: &str,
+        encoding: StringEncoding,
         position: isize,
         callback: Arc<AsyncClosure<usize, std::io::Error>>,
     ) {
@@ -168,7 +169,7 @@ impl FileHandle {
     pub fn write_file_with_str(
         &mut self,
         data: &str,
-        encoding: &str,
+        encoding: StringEncoding,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
@@ -177,7 +178,7 @@ impl FileHandle {
 
     pub fn write_file_with_bytes(
         &mut self,
-        data: Buffer,
+        data: &Buffer,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();

@@ -1,2 +1,7 @@
+use std::fs::File;
+
 #[repr(C)]
-pub struct ReadStream {}
+pub enum ReadStream {
+    File(File),
+    Buffer(Buffer)
+}

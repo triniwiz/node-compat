@@ -18,13 +18,13 @@ use notify::{Config, EventKind, recommended_watcher, RecommendedWatcher};
 use notify::event::{AccessKind, CreateKind, DataChange, MetadataKind, ModifyKind, RemoveKind, RenameMode};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use node_buffer::Buffer;
+use node_buffer::{Buffer, StringEncoding};
 
 use crate::file_dir::FileDir;
 use crate::file_dirent::FileDirent;
 use crate::file_stat::FileStat;
-use crate::prelude::handle_meta;
-use crate::sync::open_path_with_str;
+use crate::prelude::{FsEncoding, FsEncodingType, handle_meta};
+use crate::sync::{open_path, ReaddirResult};
 
 pub type OnSuccessCallback = extern "C" fn(result: Option<NonNull<c_void>>);
 
@@ -104,22 +104,13 @@ impl FileWatchEvent {
 }
 
 
-#[cfg(target_os = "android")]
-fn set_handler(builder: &mut tokio::runtime::Builder) {
-    builder.on_thread_start(|| {
-        if let Some(jvm) = crate::android::JVM.get() {
-            let _ = jvm.attach_current_thread();
-        }
-    });
-}
-
-
 #[allow(dead_code)]
 pub(crate) struct WatcherItem {
     watcher: RecommendedWatcher,
     callbacks: Vec<Arc<AsyncClosure<WatchEvent, Error>>>,
     is_alive: AtomicBool,
     persistent: bool,
+    encoding: FsEncodingType,
 }
 
 #[allow(dead_code)]
@@ -128,6 +119,7 @@ pub(crate) struct FileWatcherItem {
     callbacks: Vec<Arc<AsyncClosure<FileWatchEvent, Error>>>,
     is_alive: AtomicBool,
     persistent: bool,
+    encoding: FsEncodingType
 }
 
 type WatcherMap = Arc<Mutex<HashMap<String, WatcherItem>>>;
@@ -145,7 +137,6 @@ fn file_watcher_map() -> &'static FileWatcherMap {
 
 pub fn access(path: &str, access: c_int, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::access(&path, access) {
             Ok(_) => {
@@ -172,8 +163,8 @@ pub fn append_file_with_str(fd: c_int, data: &str, callback: Arc<AsyncClosure<()
     });
 }
 
-pub fn append_file_with_bytes(fd: c_int, data: Buffer, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
+pub fn append_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosure<(), Error>>) {
+    let data = data.clone();
     let _ = node_core::thread::spawn(move || {
         match super::sync::append_file_with_bytes(fd, data.buffer()) {
             Ok(_) => {
@@ -209,13 +200,13 @@ pub fn append_file_with_path_str(
 
 pub fn append_file_with_path_bytes(
     path: &str,
-    data: Buffer,
+    data: &Buffer,
     mode: c_int,
     flags: c_int,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
+    let data = data.clone();
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::append_file_with_path_bytes(&path, data.buffer(), mode, flags) {
             Ok(_) => {
@@ -230,7 +221,6 @@ pub fn append_file_with_path_bytes(
 
 pub fn chmod(path: &str, mode: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::chmod(&path, mode) {
             Ok(_) => {
@@ -245,7 +235,6 @@ pub fn chmod(path: &str, mode: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
 
 pub fn chown(path: &str, uid: c_uint, gid: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::chown(&path, uid, gid) {
             Ok(_) => {
@@ -259,7 +248,6 @@ pub fn chown(path: &str, uid: c_uint, gid: c_uint, callback: Arc<AsyncClosure<()
 }
 
 pub fn close(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match catch_unwind(|| {
             let _ = unsafe { File::from_raw_fd(fd) };
@@ -280,7 +268,6 @@ pub fn close(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
 pub fn copy_file(src: &str, dest: &str, flags: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
     let src = src.to_string();
     let dest = dest.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         let src = Path::new(&src);
         let dest = Path::new(&dest);
@@ -307,7 +294,6 @@ pub fn cp(_src: &str, _dest: &str) {
 
 pub fn exists(path: &str, callback: Arc<AsyncClosure<bool, Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         let exists = super::sync::exists(&path);
         callback.on_success(Some(exists));
@@ -315,7 +301,6 @@ pub fn exists(path: &str, callback: Arc<AsyncClosure<bool, Error>>) {
 }
 
 pub fn fchmod(fd: c_int, mode: c_ushort, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::fchmod(fd, mode) {
             Ok(_) => {
@@ -342,8 +327,6 @@ pub fn fchown(fd: c_int, uid: c_uint, gid: c_uint, callback: Arc<AsyncClosure<()
 }
 
 pub fn fdatasync(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::fdatasync(fd) {
             Ok(_) => {
@@ -357,8 +340,6 @@ pub fn fdatasync(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
 }
 
 pub fn fstat(fd: c_int, callback: Arc<AsyncClosure<FileStat, Error>>) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::fstat(fd) {
             Ok(meta) => {
@@ -372,8 +353,6 @@ pub fn fstat(fd: c_int, callback: Arc<AsyncClosure<FileStat, Error>>) {
 }
 
 pub fn fsync(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::fsync(fd) {
             Ok(_) => {
@@ -387,8 +366,6 @@ pub fn fsync(fd: c_int, callback: Arc<AsyncClosure<(), Error>>) {
 }
 
 pub fn ftruncate(fd: c_int, len: c_long, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::ftruncate(fd, len) {
             Ok(_) => {
@@ -402,8 +379,6 @@ pub fn ftruncate(fd: c_int, len: c_long, callback: Arc<AsyncClosure<(), Error>>)
 }
 
 pub fn futimes(fd: c_int, atime: c_long, mtime: c_long, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::futimes(fd, atime, mtime) {
             Ok(_) => {
@@ -417,8 +392,6 @@ pub fn futimes(fd: c_int, atime: c_long, mtime: c_long, callback: Arc<AsyncClosu
 }
 
 pub fn lchmod(path: &str, mode: c_ushort, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
         match super::sync::lchmod(&path, mode) {
@@ -433,8 +406,6 @@ pub fn lchmod(path: &str, mode: c_ushort, callback: Arc<AsyncClosure<(), Error>>
 }
 
 pub fn lchown(path: &str, uid: c_uint, gid: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
         match super::sync::lchown(&path, uid, gid) {
@@ -450,8 +421,6 @@ pub fn lchown(path: &str, uid: c_uint, gid: c_uint, callback: Arc<AsyncClosure<(
 
 pub fn lutimes(path: &str, atime: c_long, mtime: c_long, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::lutimes(&path, atime, mtime) {
             Ok(_) => {
@@ -465,7 +434,6 @@ pub fn lutimes(path: &str, atime: c_long, mtime: c_long, callback: Arc<AsyncClos
 }
 
 pub fn link(existing_path: &str, new_path: &str, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
     let existing_path = existing_path.to_string();
     let new_path = new_path.to_string();
     let _ = node_core::thread::spawn(move || {
@@ -481,7 +449,6 @@ pub fn link(existing_path: &str, new_path: &str, callback: Arc<AsyncClosure<(), 
 }
 
 pub fn lstat(path: &str, callback: Arc<AsyncClosure<FileStat, Error>>) {
-    let callback = Arc::clone(&callback);
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
@@ -498,8 +465,6 @@ pub fn lstat(path: &str, callback: Arc<AsyncClosure<FileStat, Error>>) {
 
 pub fn mkdir(path: &str, mode: c_uint, recursive: bool, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::mkdir(&path, mode, recursive) {
             Ok(_) => {
@@ -514,7 +479,6 @@ pub fn mkdir(path: &str, mode: c_uint, recursive: bool, callback: Arc<AsyncClosu
 
 pub fn mkdtemp(prefix: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
     let prefix = prefix.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::make_temp(None, Some(&prefix), None, false) {
@@ -530,12 +494,11 @@ pub fn mkdtemp(prefix: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
 
 pub fn open(path: &str, flags: c_int, mode: c_int, callback: Arc<AsyncClosure<c_int, Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
-        match open_path_with_str(&path, flags, mode) {
+        match open_path(&path, flags, mode) {
             Ok(fd) => {
-                callback.on_success(Some(fd));
+                callback.on_suopen_pathccess(Some(fd));
             }
             Err(error) => {
                 callback.on_error(Some(error));
@@ -546,8 +509,6 @@ pub fn open(path: &str, flags: c_int, mode: c_int, callback: Arc<AsyncClosure<c_
 
 pub fn opendir(path: &str, callback: Arc<AsyncClosure<FileDir, Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::opendir(&path) {
             Ok(fd) => {
@@ -568,7 +529,6 @@ pub fn read(
     position: isize,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
     let mut buffer = buffer.clone();
 
     let _ = node_core::thread::spawn(move || {
@@ -583,44 +543,26 @@ pub fn read(
     });
 }
 
-pub fn readdir_with_file_types(
+pub fn readdir(
     path: &str,
-    _encoding: &str,
-    callback: Box<dyn Fn(Option<Vec<FileDirent>>, Option<Error>) + Send>,
+    with_file_types: bool,
+    encoding: FsEncodingType,
+    callback: Box<dyn Fn(Option<Vec<ReaddirResult>>, Option<Error>) + Send>,
 ) {
     let path = path.to_string();
-    let _encoding = _encoding.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::readdir_with_file_types(&path, &_encoding) {
+        match super::sync::readdir(&path, with_file_types, encoding) {
             Ok(read) => callback(Some(read), None),
             Err(error) => callback(None, Some(error)),
         }
     });
 }
 
-pub fn readdir_with_file(
-    path: &str,
-    _encoding: &str,
-    callback: Box<dyn Fn(Option<Vec<OsString>>, Option<std::io::Error>) + Send>,
-) {
+pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let path = path.to_string();
-    let _encoding = _encoding.to_string();
-
     let _ = node_core::thread::spawn(move || {
-        match super::sync::readdir_with_file(&path, &_encoding) {
-            Ok(read) => callback(Some(read), None),
-            Err(error) => callback(None, Some(error)),
-        }
-    });
-}
-
-pub fn read_file(path: &str, flags: c_int, callback: Arc<AsyncClosure<Buffer, Error>>) {
-    let path = path.to_string();
-    let callback = Arc::clone(&callback);
-
-    let _ = node_core::thread::spawn(move || {
-        match super::sync::read_file(&path, flags) {
+        match super::sync::read_file(&path, encoding, flags) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -631,11 +573,9 @@ pub fn read_file(path: &str, flags: c_int, callback: Arc<AsyncClosure<Buffer, Er
     });
 }
 
-pub fn read_file_with_fd(fd: c_int, flags: c_int, callback: Arc<AsyncClosure<Buffer, Error>>) {
-    let callback = Arc::clone(&callback);
-
+pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, flags: c_int, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let _ = node_core::thread::spawn(move || {
-        match super::sync::read_file_with_fd(fd, flags) {
+        match super::sync::read_file_with_fd(fd, encoding, flags) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -646,13 +586,10 @@ pub fn read_file_with_fd(fd: c_int, flags: c_int, callback: Arc<AsyncClosure<Buf
     });
 }
 
-pub fn read_link(path: &str, encoding: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
+pub fn read_link(path: &str, encoding: FsEncodingType, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let path = path.to_string();
-    let encoding = encoding.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
-        match super::sync::read_link(&path, &encoding) {
+        match super::sync::read_link(&path, encoding) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -669,8 +606,6 @@ pub fn readv(
     position: c_long,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         let mut buffers = buffers;
         match super::sync::readv(fd, buffers.as_mut_slice(), position) {
@@ -691,8 +626,6 @@ pub fn readv_raw(
     position: c_long,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
-
     // transmute to send pointer
     let buffer = buffer as c_longlong;
     let _ = node_core::thread::spawn(move || {
@@ -710,8 +643,6 @@ pub fn readv_raw(
 
 pub fn real_path(path: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::real_path(&path) {
             Ok(buf) => {
@@ -727,8 +658,6 @@ pub fn real_path(path: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
 pub fn rename(old_path: &str, new_path: &str, callback: Arc<AsyncClosure<(), Error>>) {
     let path = old_path.to_string();
     let new_path = new_path.to_string();
-    let callback = Arc::clone(&callback);
-
     let _ = node_core::thread::spawn(move || {
         match super::sync::rename(&path, &new_path) {
             Ok(_) => {
@@ -748,7 +677,6 @@ pub fn rmdir(
     retry_delay: c_ulonglong,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
-    let callback = Arc::clone(&callback);
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
@@ -772,7 +700,6 @@ pub fn rm(
     callback: Arc<AsyncClosure<(), node_core::error::AnyError>>,
 ) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::rm(&path, max_retries, recursive, retry_delay) {
@@ -788,7 +715,6 @@ pub fn rm(
 
 pub fn stat(path: &str, throw_if_no_entry: bool, callback: Arc<AsyncClosure<FileStat, Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::stat(&path) {
@@ -812,7 +738,6 @@ pub fn symlink(target: &str, path: &str, type_: &str, callback: Arc<AsyncClosure
     let target = target.to_string();
     let path = path.to_string();
     let type_ = type_.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::symlink(&target, &path, &type_) {
@@ -828,7 +753,6 @@ pub fn symlink(target: &str, path: &str, type_: &str, callback: Arc<AsyncClosure
 
 pub fn truncate(path: &str, len: c_ulonglong, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::truncate(&path, len) {
@@ -844,7 +768,6 @@ pub fn truncate(path: &str, len: c_ulonglong, callback: Arc<AsyncClosure<(), Err
 
 pub fn unlink(path: &str, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::unlink(&path) {
@@ -884,7 +807,6 @@ pub fn unwatch_file(filename: &str, callback: Option<Arc<AsyncClosure<FileWatchE
 
 pub fn utimes(path: &str, atime: c_long, mtime: c_long, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::utimes(&path, atime, mtime) {
@@ -932,7 +854,7 @@ pub fn watch(
     filename: &str,
     persistent: bool,
     recursive: bool,
-    _encoding: &str,
+    encoding: FsEncodingType,
     callback: Arc<AsyncClosure<WatchEvent, Error>>,
 ) {
     use notify::{recommended_watcher, RecursiveMode, Watcher};
@@ -982,6 +904,7 @@ pub fn watch(
                         callbacks: vec![callback],
                         is_alive: AtomicBool::new(true),
                         persistent,
+                        encoding
                     };
 
                     map.insert(filename.clone(), item);
@@ -1029,7 +952,7 @@ pub fn watch(
                                     _ => {}
                                 }
                                 if event_type.is_empty() || !event_file_name.to_str().map(|s| !s.is_empty()).unwrap_or(false) {
-                                  continue
+                                    continue;
                                 }
                                 for callback in item.callbacks.iter() {
                                     callback.on_success(Some(WatchEvent::new(
@@ -1144,7 +1067,7 @@ pub fn watch_file(
             }
             let config = Config::default()
                 .with_poll_interval(
-                    Duration::from_secs(interval)
+                    Duration::from_secs(interval.try_into().unwrap())
                 );
 
 
@@ -1243,14 +1166,13 @@ pub fn watch_file(
 
 pub fn write(
     fd: c_int,
-    buffer: Buffer,
+    buffer: &Buffer,
     offset: usize,
     length: usize,
     position: isize,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
-
+    let buffer = buffer.clone();
     let _ = node_core::thread::spawn(move || {
         match super::sync::write(fd, buffer.buffer(), offset, length, position) {
             Ok(wrote) => {
@@ -1266,16 +1188,14 @@ pub fn write(
 pub fn write_string(
     fd: c_int,
     string: &str,
-    encoding: &str,
+    encoding: StringEncoding,
     position: isize,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
     let string = string.to_string();
-    let encoding = encoding.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_string(fd, &string, &encoding, position) {
+        match super::sync::write_string(fd, &string, encoding, position) {
             Ok(wrote) => {
                 callback.on_success(Some(wrote));
             }
@@ -1289,15 +1209,13 @@ pub fn write_string(
 pub fn write_file_with_str(
     fd: c_int,
     data: &str,
-    encoding: &str,
+    encoding: StringEncoding,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let data = data.to_string();
-    let encoding = encoding.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_file_with_str(fd, &data, &encoding) {
+        match super::sync::write_file_with_str(fd, &data, encoding) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1308,9 +1226,8 @@ pub fn write_file_with_str(
     });
 }
 
-pub fn write_file_with_bytes(fd: c_int, data: Buffer, callback: Arc<AsyncClosure<(), Error>>) {
-    let callback = Arc::clone(&callback);
-
+pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosure<(), Error>>) {
+    let data = data.clone();
     let _ = node_core::thread::spawn(move || {
         match super::sync::write_file_with_bytes(fd, data.buffer()) {
             Ok(_) => {
@@ -1326,18 +1243,16 @@ pub fn write_file_with_bytes(fd: c_int, data: Buffer, callback: Arc<AsyncClosure
 pub fn write_file_with_str_from_path(
     path: &str,
     data: &str,
-    encoding: &str,
+    encoding: StringEncoding,
     mode: c_int,
     flag: c_int,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
-    let encoding = encoding.to_string();
     let data = data.to_string();
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_file_with_str_from_path(&path, &data, &encoding, mode, flag) {
+        match super::sync::write_file_with_str_from_path(&path, &data, encoding, mode, flag) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1350,21 +1265,18 @@ pub fn write_file_with_str_from_path(
 
 pub fn write_file_with_bytes_from_path(
     path: &str,
-    data: Buffer,
-    encoding: &str,
+    data: &Buffer,
     mode: c_int,
     flag: c_int,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
-    let encoding = encoding.to_string();
-    let callback = Arc::clone(&callback);
+    let data = data.clone();
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::write_file_with_bytes_from_path(
             &path,
             data.buffer(),
-            &encoding,
             mode,
             flag,
         ) {
@@ -1384,7 +1296,6 @@ pub fn writev(
     position: c_long,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
-    let callback = Arc::clone(&callback);
     let _ = node_core::thread::spawn(move || {
         match super::sync::writev(fd, buffers, position) {
             Ok(wrote) => {
@@ -1406,7 +1317,6 @@ pub fn writev_raw(
 ) {
     // transmute to send pointer
     let buffer = buffer as i64;
-    let callback = Arc::clone(&callback);
 
     let _ = node_core::thread::spawn(move || {
         let buffer = buffer as *const *const Buffer;

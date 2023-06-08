@@ -1,4 +1,53 @@
+use std::ffi::CString;
+use node_buffer::Buffer;
 use crate::file_stat::FileStat;
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum FsEncoding {
+    String(CString),
+    Buffer(Buffer),
+}
+
+impl From<CString> for FsEncoding {
+    fn from(value: CString) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<Buffer> for FsEncoding {
+    fn from(value: Buffer) -> Self {
+        Self::Buffer(value)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[repr(C)]
+pub enum FsEncodingType {
+    Ascii,
+    Utf8,
+    Utf16le,
+    Ucs2,
+    Latin1,
+    Buffer,
+}
+
+impl TryFrom<i32> for FsEncodingType {
+    type Error = &'static str;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(FsEncodingType::Ascii),
+            1 => Ok(FsEncodingType::Utf8),
+            2 => Ok(FsEncodingType::Utf16le),
+            3 => Ok(FsEncodingType::Ucs2),
+            4 => Ok(FsEncodingType::Latin1),
+            5 => Ok(FsEncodingType::Buffer),
+            _ => {
+                Err("Invalid Encoding")
+            }
+        }
+    }
+}
 
 pub fn handle_meta(metadata: &std::fs::Metadata) -> FileStat {
     use std::os::unix::prelude::*;

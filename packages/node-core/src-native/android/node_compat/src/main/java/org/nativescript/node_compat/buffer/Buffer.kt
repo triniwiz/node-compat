@@ -346,6 +346,11 @@ class Buffer private constructor(var native: Long) {
     }
 
     @JvmStatic
+    fun from(buffer: ByteBuffer): Buffer {
+      return Buffer(nativeFromReference(buffer)).apply { this.buffer = buffer }
+    }
+
+    @JvmStatic
     fun copyBytesFrom(buffer: ByteBuffer, offset: Long = -1, length: Long = -1): Buffer {
       return Buffer(nativeCopyBytesFrom(buffer, offset, length))
     }
@@ -368,6 +373,12 @@ class Buffer private constructor(var native: Long) {
 
     @JvmStatic
     external fun nativeAlloc(size: Long, text: String?, encoding: Int): Long
+
+    @JvmStatic
+    external fun nativeFromReference(
+      buffer: ByteBuffer,
+    ): Long
+
 
     @JvmStatic
     external fun nativeFromBuffer(buffer: Long): Long

@@ -4,20 +4,37 @@ use std::ffi::{CStr, CString, OsString};
 use std::fs::{File, OpenOptions, Permissions};
 use std::io::{IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write};
 use std::os::raw::c_ulonglong;
+
+
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+#[cfg(unix)]
 use std::os::unix::prelude::IntoRawFd;
+#[cfg(unix)]
 use std::os::unix::prelude::*;
-use std::path::Path;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt;
+
+#[cfg(windows)]
+use std::os::windows::prelude::*;
+
+
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Duration;
 use std::{fs, io};
+
+#[cfg(windows)]
+use std::os::windows::io::RawHandle;
+#[cfg(windows)]
+use std::os::windows::prelude::FromRawHandle;
 
 use backoff::Error;
 use backoff::ExponentialBackoff;
 use faccess::PathExt;
 use libc::{c_char, c_int, c_long, c_uint, c_ushort};
 use rand::{thread_rng, Rng};
-use node_buffer::Buffer;
+use node_buffer::{Buffer, get_bytes, StringEncoding};
 
 use crate::file_dir::FileDir;
 use crate::file_dirent::FileDirent;
@@ -28,8 +45,9 @@ use crate::{
     FILE_OPEN_OPTIONS_O_CREAT, FILE_OPEN_OPTIONS_O_EXCL, FILE_OPEN_OPTIONS_O_RDONLY,
     FILE_OPEN_OPTIONS_O_TRUNC, FILE_OPEN_OPTIONS_O_WRONLY,
 };
+use crate::prelude::{FsEncoding, FsEncodingType};
 
-fn file_from_path_str(path: &str, flags: c_int, mode: c_int) -> std::io::Result<File> {
+fn file_from_path(path: &str, flags: c_int, mode: c_int) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
 
     if (flags & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
@@ -62,19 +80,8 @@ fn file_from_path_str(path: &str, flags: c_int, mode: c_int) -> std::io::Result<
     options.open(path)
 }
 
-fn file_from_path(path: *const c_char, flags: c_int, mode: c_int) -> std::io::Result<File> {
-    let path = unsafe { CStr::from_ptr(path) };
-    file_from_path_str(path.to_string_lossy().as_ref(), flags, mode)
-}
-
-pub fn open_path_with_str(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
-    let file = file_from_path_str(path, flags, mode)?;
-    Ok(file.into_raw_fd())
-}
-
-pub fn open_path(path: *const c_char, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
-    let file = file_from_path(path, flags, mode).map(|f| f.into_raw_fd())?;
-
+pub fn open_path(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
+    let file = file_from_path(path, flags, mode)?;
     Ok(file.into_raw_fd())
 }
 
@@ -89,18 +96,10 @@ pub fn open_handle_with_fd(fd: i32) -> std::io::Result<FileHandle> {
     Ok(FileHandle::new(file))
 }
 
-pub fn open_handle_with_path_str(
+pub fn open_handle_with_path(
     path: &str,
     flags: c_int,
     mode: c_int,
-) -> std::io::Result<FileHandle> {
-    file_from_path_str(path, flags, mode).map(|v| FileHandle::new(v))
-}
-
-pub fn open_handle_with_path(
-    path: *const c_char,
-    flags: c_int,
-    mode: i32,
 ) -> std::io::Result<FileHandle> {
     file_from_path(path, flags, mode).map(|v| FileHandle::new(v))
 }
@@ -141,6 +140,11 @@ pub fn append_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn append_file_with_buffer(fd: c_int, data: &Buffer) -> std::io::Result<()> {
+    let data = data.buffer();
+    append_file_with_bytes(fd, data)
+}
+
 pub fn append_file_with_path_str(
     path: &str,
     data: &str,
@@ -165,6 +169,16 @@ pub fn append_file_with_path_bytes(
     let ret = file.write(data).map(|_| ());
     let _ = file.into_raw_fd();
     ret
+}
+
+pub fn append_file_with_path_buffer(
+    path: &str,
+    data: &Buffer,
+    mode: c_int,
+    flags: c_int,
+) -> std::io::Result<()> {
+    let data = data.buffer();
+    append_file_with_path_bytes(path, data, mode, flags)
 }
 
 pub fn chmod(path: &str, mode: c_uint) -> std::io::Result<()> {
@@ -203,7 +217,7 @@ pub fn create_write_stream(_path: &str) {
 }
 
 pub fn exists(path: &str) -> bool {
-    std::path::Path::new(path).exists()
+    Path::new(path).exists()
 }
 
 pub fn fchmod(fd: c_int, mode: c_ushort) -> io::Result<()> {
@@ -413,14 +427,14 @@ pub(crate) fn make_temp(
         Some(p) => p.to_path_buf(),
         None => std::env::temp_dir(),
     }
-    .join("_");
+        .join("_");
     let mut rng = thread_rng();
     loop {
         let unique = rng.gen::<u32>();
         buf.set_file_name(format!("{}{:08x}{}", prefix_, unique, suffix_));
         let r = if is_dir {
             #[allow(unused_mut)]
-            let mut builder = std::fs::DirBuilder::new();
+                let mut builder = std::fs::DirBuilder::new();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::DirBuilderExt;
@@ -445,14 +459,12 @@ pub(crate) fn make_temp(
     }
 }
 
-pub fn mkdtemp<'a>(prefix: &str) -> std::io::Result<Cow<'a, str>> {
-    let path = make_temp(None, Some(prefix), None, true)?;
-    let os_str = path.into_os_string().to_string_lossy().to_string();
-    Ok(Cow::from(os_str))
+pub fn mkdtemp<'a>(prefix: &str) -> std::io::Result<PathBuf> {
+    make_temp(None, Some(prefix), None, true)
 }
 
 pub fn open(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
-    open_path_with_str(path, flags, mode)
+    open_path(path, flags, mode)
 }
 
 pub fn opendir(path: &str) -> io::Result<FileDir> {
@@ -465,6 +477,7 @@ pub fn opendir(path: &str) -> io::Result<FileDir> {
     Ok(FileDir::new(path.to_string(), dir))
 }
 
+#[cfg(not(windows))]
 pub fn read(
     fd: c_int,
     buffer: &mut [u8],
@@ -474,6 +487,28 @@ pub fn read(
 ) -> std::io::Result<usize> {
     let mut file = unsafe { File::from_raw_fd(fd) };
 
+    read_file_internal(&mut file, buffer, offset, length, position)
+}
+
+#[cfg(windows)]
+pub fn read(
+    fd: RawHandle,
+    buffer: &mut [u8],
+    offset: usize,
+    length: usize,
+    position: isize,
+) -> std::io::Result<usize> {
+    let mut file = unsafe { File::from_raw_handle(fd) };
+    read_file_internal(&mut file, buffer, offset, length, position)
+}
+
+fn read_file_internal(
+    file: &mut File,
+    buffer: &mut [u8],
+    offset: usize,
+    length: usize,
+    position: isize,
+) -> std::io::Result<usize> {
     if position != -1 {
         match file.seek(SeekFrom::Start(position as u64)) {
             Ok(_) => {}
@@ -502,41 +537,155 @@ pub fn read(
     }
 }
 
-pub fn readdir_with_file_types(path: &str, _encoding: &str) -> std::io::Result<Vec<FileDirent>> {
-    let read = fs::read_dir(path)?;
-    let mut buf = Vec::new();
-    for entry in read {
-        let dir = entry?;
-        buf.push(FileDirent::new_regular(dir))
-    }
-    Ok(buf)
+
+#[derive(Clone, Debug)]
+pub enum ReaddirResult {
+    String(CString),
+    Buffer(Buffer),
+    Type(FileDirent),
 }
 
-pub fn readdir_with_file(path: &str, _encoding: &str) -> std::io::Result<Vec<OsString>> {
-    let mut result = Vec::new();
-    for dir in fs::read_dir(path)? {
-        let dir = dir?;
-        result.push(dir.file_name())
-    }
+pub fn readdir(path: &str, with_file_types: bool, encoding: FsEncodingType) -> io::Result<Vec<ReaddirResult>> {
+    let read = fs::read_dir(path)?;
+    read.map(|entry| {
+        let dir = entry?;
+        if with_file_types {
+            ReaddirResult::Type(FileDirent::new_regular(dir))
+        } else {
+            let buffer = Buffer::from_string(
+                CString::new(dir.file_name().to_string_lossy().to_string()).unwrap(), StringEncoding::Utf8,
+            );
+            match encoding {
+                FsEncodingType::Ascii => {
+                    CString::new(
+                        buffer.as_string(Some(StringEncoding::Ascii), None, None)
+                    ).unwrap()
+                }
+                FsEncodingType::Utf8 => {
+                    CString::new(
+                        buffer.as_string(Some(StringEncoding::Utf8), None, None)
+                    ).unwrap()
+                }
+                FsEncodingType::Utf16le => {
+                    CString::new(
+                        buffer.as_string(Some(StringEncoding::Utf16le), None, None)
+                    ).unwrap()
+                }
+                FsEncodingType::Ucs2 => {
+                    CString::new(
+                        buffer.as_string(Some(StringEncoding::Ucs2), None, None)
+                    ).unwrap()
+                }
+                FsEncodingType::Latin1 => {
+                    ReaddirResult::String(
+                        CString::new(
+                            buffer.as_string(Some(StringEncoding::Latin1), None, None)
+                        ).unwrap()
+                    )
+                }
+                FsEncodingType::Buffer => {
+                    ReaddirResult::Buffer(buffer)
+                }
+            }
+        }
+    })
+        .collect::<io::Result<Vec<ReaddirResult>>>()
+}
+
+
+fn read_file_with_file(mut file: File, encoding: FsEncodingType) -> std::io::Result<FsEncoding> {
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)?;
+    let result = Buffer::from_vec(buf);
+    let result = match encoding {
+        FsEncodingType::Ascii => {
+            FsEncoding::String(
+                CString::new(
+                    result.as_string(Some(StringEncoding::Ascii), None, None)
+                ).unwrap()
+            ).into()
+        }
+        FsEncodingType::Utf8 => {
+            FsEncoding::String(
+                CString::new(
+                    result.as_string(Some(StringEncoding::Utf8), None, None)
+                ).unwrap()
+            ).into()
+        }
+        FsEncodingType::Utf16le => {
+            FsEncoding::String(
+                CString::new(
+                    result.as_string(Some(StringEncoding::Utf16le), None, None)
+                ).unwrap()
+            ).into()
+        }
+        FsEncodingType::Ucs2 => {
+            FsEncoding::String(
+                CString::new(
+                    result.as_string(Some(StringEncoding::Latin1), None, None)
+                ).unwrap()
+            ).into()
+        }
+        FsEncodingType::Latin1 => {
+            FsEncoding::String(
+                CString::new(
+                    result.as_string(Some(StringEncoding::Latin1), None, None)
+                ).unwrap()
+            )
+        }
+        FsEncodingType::Buffer => {
+            FsEncoding::Buffer(result).into()
+        }
+    };
     Ok(result)
 }
 
-pub fn read_file(path: &str, flags: c_int) -> std::io::Result<Buffer> {
-    let mut file = file_from_path_str(path, flags, 0)?;
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf)?;
-    Ok(Buffer::from_vec(buf))
+pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int) -> std::io::Result<FsEncoding> {
+    let file = file_from_path(path, flags, 0)?;
+    read_file_with_file(file, encoding)
 }
 
-pub fn read_file_with_fd(fd: c_int, _flags: i32) -> std::io::Result<Buffer> {
-    let mut file = unsafe { File::from_raw_fd(fd) };
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf)?;
-    Ok(Buffer::from_vec(buf))
+pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, _flags: i32) -> std::io::Result<FsEncoding> {
+    let file = unsafe { File::from_raw_fd(fd) };
+    read_file_with_file(file, encoding)
 }
 
-pub fn read_link(path: &str, _encoding: &str) -> std::io::Result<std::path::PathBuf> {
-    fs::read_link(path)
+pub fn read_link(path: &str, encoding: FsEncodingType) -> std::io::Result<FsEncoding> {
+    let result = fs::read_link(path)?;
+
+    #[cfg(unix)]
+        let result = result.into_os_string().into_vec();
+
+
+    #[cfg(windows)]
+        let result = result.into_os_string().encode_wide().chain(Some(0)).collect::<Vec<_>>();
+
+    let result = CString::new(
+        result
+    )?;
+    let buffer = Buffer::from_string(result, StringEncoding::Utf8);
+    let result = match encoding {
+        FsEncodingType::Ascii => {
+            buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
+        }
+        FsEncodingType::Utf8 => {
+            buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
+        }
+        FsEncodingType::Utf16le => {
+            buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
+        }
+        FsEncodingType::Ucs2 => {
+            buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
+        }
+        FsEncodingType::Latin1 => {
+            buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
+        }
+        FsEncodingType::Buffer => {
+            buffer.into()
+        }
+    };
+
+    Ok(result)
 }
 
 pub fn readv(fd: c_int, buffers: &mut [Buffer], position: c_long) -> std::io::Result<usize> {
@@ -612,7 +761,7 @@ pub fn rmdir(
                     return Error::Transient {
                         err: e,
                         retry_after: Some(Duration::from_millis(retry_delay)),
-                    }
+                    };
                 }
 
                 Error::permanent(e)
@@ -622,7 +771,7 @@ pub fn rmdir(
         backoff::retry(bf, op).map_err(|e| match e {
             Error::Permanent(ref err) => {
                 node_core::error::custom_error("", err.to_string())
-            },
+            }
             Error::Transient { ref err, .. } => {
                 node_core::error::custom_error("", err.to_string())
             }
@@ -656,7 +805,7 @@ pub fn rm(
                     return Error::Transient {
                         err: e,
                         retry_after: Some(Duration::from_millis(retry_delay)),
-                    }
+                    };
                 }
 
                 Error::permanent(e)
@@ -666,7 +815,7 @@ pub fn rm(
         backoff::retry(bf, op).map_err(|e| match e {
             Error::Permanent(ref err) => {
                 node_core::error::custom_error("", err.to_string())
-            },
+            }
             Error::Transient { ref err, .. } => {
                 node_core::error::custom_error("", err.to_string())
             }
@@ -679,6 +828,7 @@ pub fn stat(path: &str) -> std::io::Result<std::fs::Metadata> {
 }
 
 pub fn symlink(target: &str, path: &str, _type_: &str) -> std::io::Result<()> {
+    // todo handle type
     std::os::unix::fs::symlink(target, path)
 }
 
@@ -763,26 +913,26 @@ pub fn write(
 pub fn write_string(
     fd: c_int,
     string: &str,
-    _encoding: &str,
+    encoding: StringEncoding,
     position: isize,
 ) -> std::io::Result<usize> {
     let mut file = unsafe { File::from_raw_fd(fd) };
     let new_position = file.stream_position().unwrap_or_default();
-    let buffer = string.as_bytes();
+    let buffer = get_bytes(string, encoding);
     let result = if position == -1 {
-        file.write(buffer)
+        file.write(buffer.as_slice())
     } else {
-        file.write_at(buffer, position as u64)
+        file.write_at(buffer.as_slice(), position as u64)
     };
 
     let ret = match result {
         Ok(wrote) => {
             if wrote == 0 {
-                return Ok(std::cmp::min(new_position as usize, wrote));
+                return Ok(min(new_position as usize, wrote));
             }
-            std::io::Result::Ok(wrote)
+            Ok(wrote)
         }
-        Err(error) => std::io::Result::Err(error),
+        Err(error) => Err(error),
     };
 
     let _ = file.into_raw_fd();
@@ -790,9 +940,10 @@ pub fn write_string(
     ret
 }
 
-pub fn write_file_with_str(fd: c_int, data: &str, _encoding: &str) -> std::io::Result<()> {
+pub fn write_file_with_str(fd: c_int, data: &str, encoding: StringEncoding) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
-    let ret = file.write(data.as_bytes());
+    let data = get_bytes(data, encoding);
+    let ret = file.write(data.as_slice());
     let _ = file.into_raw_fd();
     ret.map(|_| ())
 }
@@ -807,7 +958,7 @@ pub fn write_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
 pub fn write_file_with_str_from_path(
     path: &str,
     data: &str,
-    _encoding: &str,
+    encoding: StringEncoding,
     mode: c_int,
     flag: c_int,
 ) -> std::io::Result<()> {
@@ -841,13 +992,13 @@ pub fn write_file_with_str_from_path(
     }
 
     let mut file = options.open(path)?;
-    file.write(data.as_bytes()).map(|_| ())
+    let data = get_bytes(data, encoding);
+    file.write(data.as_slice()).map(|_| ())
 }
 
 pub fn write_file_with_bytes_from_path(
     path: &str,
     data: &[u8],
-    _encoding: &str,
     mode: c_int,
     flag: c_int,
 ) -> std::io::Result<()> {
@@ -879,9 +1030,19 @@ pub fn write_file_with_bytes_from_path(
     if mode != 0 {
         options.mode(mode as u32);
     }
+
     let mut file = options.open(path)?;
 
     file.write(data).map(|_| ())
+}
+
+pub fn write_file_with_buffer_from_path(
+    path: &str,
+    data: &Buffer,
+    mode: c_int,
+    flag: c_int,
+) -> std::io::Result<()> {
+    write_file_with_bytes_from_path(path, data.buffer(), mode, flag)
 }
 
 pub fn writev(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> std::io::Result<usize> {
@@ -890,7 +1051,7 @@ pub fn writev(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> std::io:
     if position != -1 {
         match file.seek(SeekFrom::Start(position as u64)) {
             Ok(_) => {}
-            Err(error) => return std::io::Result::Err(error),
+            Err(error) => return Err(error),
         }
     }
 

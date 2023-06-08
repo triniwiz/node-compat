@@ -13,10 +13,10 @@ use crate::fs::file_stat::build_stat_op;
 use crate::fs::prelude::*;
 
 
-type FileWatcherCallbackMap = Arc<Mutex<HashMap<Arc<AsyncCallback>, FileWatcherCallback>>>;
+type FileWatcherCallbackMap = Arc<Mutex<HashMap<AsyncCallback, FileWatcherCallback>>>;
 
 pub struct FileWatcherCallback {
-    callback: Arc<AsyncCallback>,
+    callback: AsyncCallback,
     inner: Arc<AsyncClosure<FileWatchEvent, std::io::Error>>,
 }
 
@@ -59,7 +59,7 @@ fn build_file_watch_event<'a>(env: &mut JNIEnv<'a>, event: FileWatchEvent) -> JO
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativeWatchFile(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeWatchFile(
     mut env: JNIEnv,
     _: JClass,
     path: JString,
@@ -73,7 +73,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     let callback = AsyncCallback::clone_from_ptr(callback);
     let on_success = Arc::clone(&callback);
     let item = FileWatcherCallback {
-        callback: Arc::clone(&callback),
+        callback: callback.clone(),
         inner: Arc::new(AsyncClosure {
             callback: Box::new(move |event, error| {
                 let jvm = JVM.get().unwrap();
@@ -93,7 +93,7 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
     let inner = Arc::clone(&item.inner);
     let _ = map.insert(callback, item);
 
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     node_fs::a_sync::watch_file(
         path.as_ref(),
         bigint == JNI_TRUE,
@@ -106,8 +106,8 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileSystem_nativ
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileWatcher_nativeUnref(
-    _: JNIEnv,
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileWatcher_nativeUnref(
+    mut env: JNIEnv,
     _: JClass,
     filename: JString,
     callback: jlong,
@@ -119,13 +119,13 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileWatcher_nati
         .get(&callback)
         .map(|i| (Arc::clone(&i.callback), Arc::clone(&i.inner)));
     if let Some(item) = item {
-        node_fs::a_sync::file_watcher_unref(get_str(filename, "").as_ref(), item.1);
+        node_fs::a_sync::file_watcher_unref(get_str(&mut env, &filename, "").as_ref(), item.1);
         map.remove(&item.0);
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileWatchEvent_nativeUnref(
+pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileWatchEvent_nativeUnref(
     _: JNIEnv,
     _: JClass,
     filename: JString,
@@ -155,11 +155,11 @@ pub extern "system" fn Java_org_nativescript_widgets_filesystem_FileWatchEvent_n
         }),
     });
     let item = FileWatcherCallback {
-        callback: Arc::clone(&callback),
+        callback: callback.clone(),
         inner: Arc::clone(&inner),
     };
 
-    map.insert(Arc::clone(&callback), item);
+    map.insert(callback, item);
 
-    node_fs::a_sync::file_watcher_ref(get_str(filename, "").as_ref(), inner);
+    node_fs::a_sync::file_watcher_ref(get_str(&mut env, &filename, "").as_ref(), inner);
 }

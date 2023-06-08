@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::{c_void, CString};
 use std::fmt::{Debug, Display, format, Formatter};
 use std::io::Write;
@@ -6,6 +7,53 @@ use std::sync::{Arc};
 use base64::Engine;
 use parking_lot::RwLock;
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
+
+pub fn get_bytes(value: &str, encoding: StringEncoding) -> Vec<u8> {
+    let string = CString::new(value).unwrap();
+    match encoding {
+        StringEncoding::Ascii => {
+            let string = string.to_string_lossy();
+            string.as_bytes().to_vec()
+        }
+        StringEncoding::Utf8 => {
+            string.as_bytes().to_vec()
+        }
+        StringEncoding::Utf16le => {
+            string
+                .to_string_lossy()
+                .to_string()
+                .encode_utf16()
+                .flat_map(|c| {
+                    let mut bytes = [0; 2];
+                    LittleEndian::write_u16(&mut bytes, c);
+                    bytes.to_vec()
+                })
+                .collect::<Vec<u8>>()
+        }
+        StringEncoding::Ucs2 => {
+            let string = string.as_bytes();
+            let length = string.len();
+            let string = unsafe { std::slice::from_raw_parts(string.as_ptr() as *const u16, length / 2) };
+            let mut buf = vec![0_u8; length];
+            let decoded = ucs2::decode(string, buf.as_mut_slice()).unwrap_or(0);
+            buf.shrink_to(decoded);
+            buf
+        }
+        StringEncoding::Base64 => {
+            // todo error
+            base64::engine::general_purpose::STANDARD.decode(string.as_bytes()).unwrap()
+        }
+        StringEncoding::Binary | StringEncoding::Latin1 => {
+            let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
+            decoded.as_bytes().to_vec()
+        }
+        StringEncoding::Hex => {
+            // todo error
+            hex::decode(string.as_bytes()).unwrap()
+        }
+    }
+}
+
 
 #[derive(Clone)]
 enum BufferInner {
@@ -150,48 +198,8 @@ impl Buffer {
 
 
     fn encode_string(string: &CString, encoding: StringEncoding) -> Vec<u8> {
-        match encoding {
-            StringEncoding::Ascii => {
-                let string = string.to_string_lossy();
-                string.as_bytes().to_vec()
-            }
-            StringEncoding::Utf8 => {
-                string.as_bytes().to_vec()
-            }
-            StringEncoding::Utf16le => {
-                string
-                    .to_string_lossy()
-                    .to_string()
-                    .encode_utf16()
-                    .flat_map(|c| {
-                        let mut bytes = [0; 2];
-                        LittleEndian::write_u16(&mut bytes, c);
-                        bytes.to_vec()
-                    })
-                    .collect::<Vec<u8>>()
-            }
-            StringEncoding::Ucs2 => {
-                let string = string.as_bytes();
-                let length = string.len();
-                let string = unsafe { std::slice::from_raw_parts(string.as_ptr() as *const u16, length / 2) };
-                let mut buf = vec![0_u8; length];
-                let decoded = ucs2::decode(string, buf.as_mut_slice()).unwrap_or(0);
-                buf.shrink_to(decoded);
-                buf
-            }
-            StringEncoding::Base64 => {
-                // todo error
-                base64::engine::general_purpose::STANDARD.decode(string.as_bytes()).unwrap()
-            }
-            StringEncoding::Binary | StringEncoding::Latin1 => {
-                let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
-                decoded.as_bytes().to_vec()
-            }
-            StringEncoding::Hex => {
-                // todo error
-                hex::decode(string.as_bytes()).unwrap()
-            }
-        }
+        let string = string.to_string_lossy();
+        get_bytes(string.as_ref(), encoding)
     }
 
     pub fn write_int8(&mut self, value: i8, offset: Option<usize>) {
@@ -452,12 +460,12 @@ impl Buffer {
         BigEndian::read_i64(buffer)
     }
 
-    pub fn read_big_int64be_bytes(&self, offset: Option<usize>) -> [u8;8] {
+    pub fn read_big_int64be_bytes(&self, offset: Option<usize>) -> [u8; 8] {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
-        let mut ret = [0_u8;8];
-        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1)};
+        let mut ret = [0_u8; 8];
+        let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1) };
         let _ = BigEndian::read_i64_into(buffer, store);
         ret
     }
@@ -469,13 +477,13 @@ impl Buffer {
         LittleEndian::read_i64(buffer)
     }
 
-    pub fn read_big_int64le_bytes(&self, offset: Option<usize>) -> [u8;8] {
+    pub fn read_big_int64le_bytes(&self, offset: Option<usize>) -> [u8; 8] {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
 
-        let mut ret = [0_u8;8];
-        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1)};
+        let mut ret = [0_u8; 8];
+        let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1) };
 
         let _ = LittleEndian::read_i64_into(buffer, store);
 
@@ -489,13 +497,13 @@ impl Buffer {
         BigEndian::read_u64(buffer)
     }
 
-    pub fn read_big_uint64be_bytes(&self, offset: Option<usize>) -> [u8;8] {
+    pub fn read_big_uint64be_bytes(&self, offset: Option<usize>) -> [u8; 8] {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
 
-        let mut ret = [0_u8;8];
-        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1)};
+        let mut ret = [0_u8; 8];
+        let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1) };
 
 
         let _ = BigEndian::read_u64_into(buffer, store);
@@ -510,13 +518,13 @@ impl Buffer {
         LittleEndian::read_u64(buffer)
     }
 
-    pub fn read_big_uint64le_bytes(&self, offset: Option<usize>) -> [u8;8] {
+    pub fn read_big_uint64le_bytes(&self, offset: Option<usize>) -> [u8; 8] {
         let buffer = self.buffer();
         let length = buffer.len();
         let buffer = &buffer[offset.unwrap_or(0)..length];
 
-        let mut ret = [0_u8;8];
-        let store = unsafe {std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1)};
+        let mut ret = [0_u8; 8];
+        let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1) };
 
 
         let _ = LittleEndian::read_u64_into(buffer, store);
@@ -596,6 +604,18 @@ impl Buffer {
                 Arc::new(
                     RwLock::new(
                         value
+                    )
+                )
+            )
+        )
+    }
+
+    pub unsafe fn from_reference(data: *mut u8, size: usize) -> Self {
+        Self(
+            BufferInner::Reference(
+                Arc::new(
+                    RwLock::new(
+                        (data, size)
                     )
                 )
             )

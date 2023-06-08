@@ -13,6 +13,8 @@ pub fn find_class(name: &str) -> Option<JClass> {
     })
 }
 
+
+
 pub fn to_boolean<'a>(env: &mut JNIEnv<'a>, value: bool) -> JObject<'a> {
     let integer = find_class(BOOLEAN_CLASS).unwrap();
     env.new_object(integer, "(Z)V", &[value.into()]).unwrap()
@@ -47,10 +49,8 @@ pub fn error_to_jstring(val: std::io::Error) -> GlobalRef {
         .unwrap()
 }
 
-pub fn get_str(string: JString, default: &str) -> String {
-    let vm = JVM.get().unwrap();
-    let mut env = vm.attach_current_thread().unwrap();
-    env.get_string(&string)
+pub fn get_str(env: &mut JNIEnv, string: &JString, default: &str) -> String {
+    env.get_string(string)
         .map_or(default.to_string(), |v| v.to_string_lossy().to_string())
 }
 

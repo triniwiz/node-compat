@@ -186,6 +186,27 @@ pub unsafe extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_n
 }
 
 #[no_mangle]
+pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFromReference(
+    env: JNIEnv,
+    _: JClass,
+    buffer: JByteBuffer,
+) -> jlong {
+    let buffer = match (env.get_direct_buffer_address(&buffer), env.get_direct_buffer_capacity(&buffer)) {
+        (Ok(data), Ok(size)) => {
+            unsafe { Buffer::from_reference(data, size) }
+        }
+        _ => {
+            Buffer::default()
+        }
+    };
+
+    Box::into_raw(
+        Box::new(buffer
+        )
+    ) as jlong
+}
+
+#[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeFromBuffer(
     _env: JNIEnv,
     _: JClass,
@@ -653,13 +674,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWr
     let mut buffer = unsafe { &mut *buffer };
 
     let value = unsafe { JByteArray::from_raw(value) };
-     match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
-         Ok(array) => {
-             let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
-             buffer.write_big_uint64be_bytes(value, get_offset(offset));
-         }
-         Err(_) => {}
-     };
+    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+        Ok(array) => {
+            let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
+            buffer.write_big_uint64be_bytes(value, get_offset(offset));
+        }
+        Err(_) => {}
+    };
 }
 
 #[no_mangle]
@@ -679,14 +700,13 @@ pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWr
     let mut buffer = unsafe { &mut *buffer };
 
     let value = unsafe { JByteArray::from_raw(value) };
-    match  unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
         Ok(array) => {
             let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
             buffer.write_big_uint64le_bytes(value, get_offset(offset));
         }
         Err(_) => {}
     };
-
 }
 
 #[no_mangle]
@@ -706,7 +726,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWr
     let mut buffer = unsafe { &mut *buffer };
 
     let value = unsafe { JByteArray::from_raw(value) };
-    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) }  {
+    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
         Ok(array) => {
             let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
             buffer.write_big_int64be_bytes(value, get_offset(offset));
@@ -732,7 +752,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_buffer_Buffer_nativeWr
     let mut buffer = unsafe { &mut *buffer };
 
     let value = unsafe { JByteArray::from_raw(value) };
-    match  unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
+    match unsafe { env.get_array_elements_critical(&value, ReleaseMode::NoCopyBack) } {
         Ok(array) => {
             let value = unsafe { std::slice::from_raw_parts_mut(std::mem::transmute::<*mut jbyte, *mut u8>(array.as_ptr()), array.len()) };
             buffer.write_big_int64le_bytes(value, get_offset(offset));

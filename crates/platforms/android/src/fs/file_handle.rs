@@ -1,7 +1,8 @@
-use jni::objects::{JByteBuffer, JClass, JObject, JString};
+use jni::objects::{JByteArray, JByteBuffer, JClass, JLongArray, JObject, JString};
 use jni::sys::{jbyteArray, jint, jlong, jobjectArray};
 use jni::JNIEnv;
 use libc::c_int;
+use node_buffer::StringEncoding;
 
 use crate::a_sync::AsyncCallback;
 use crate::fs::a_sync::{AsyncCallback, AsyncClosure};
@@ -35,7 +36,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeOp
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeOpen(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     path: JString,
     flags: jint,
@@ -56,22 +57,22 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeOp
         }
     }))
         .into_arc();
-    let path = get_str(path, "");
+    let path = get_str(&mut env, &path, "");
     node_fs::a_sync::open(&path, flags, mode, callback);
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeAppendFileWithBytes(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     handle: jlong,
-    bytes: jbyteArray,
+    bytes: JByteArray,
     callback: jlong,
 ) {
     let handle = handle as *mut FileHandle;
     let handle = unsafe { &mut *handle };
 
-    super::a_sync::nativeAppendFileWithBytes(env, handle.fd(), bytes, callback);
+    super::a_sync::nativeAppendFileWithBytes(&mut env, handle.fd(), bytes, callback);
 }
 
 #[no_mangle]
@@ -133,7 +134,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeCh
                 error_to_jstring(error).as_obj(),
             ))
         } else {
-            on_success.on_success(jni::objects::JObject::null().into())
+            on_success.on_success(JObject::null().into())
         }
     }))
         .into_arc();
@@ -167,7 +168,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeCl
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileSystem_nativeDatasync(
     _: JNIEnv,
     _: JClass,
-    handle: jint,
+    handle: jlong,
     callback: jlong,
 ) {
     let handle = handle as *mut FileHandle;
@@ -220,7 +221,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeRe
     env: JNIEnv,
     _: JClass,
     handle: jlong,
-    buffer: jbyteArray,
+    buffer: JByteArray,
     offset: jlong,
     length: jlong,
     position: jlong,
@@ -244,7 +245,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeRe
     env: JNIEnv,
     _: JClass,
     handle: jlong,
-    buffers: jobjectArray,
+    buffers: JLongArray,
     position: jlong,
     callback: jlong,
 ) {
@@ -389,7 +390,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWr
     env: JNIEnv,
     _: JClass,
     handle: jlong,
-    buffer: jbyteArray,
+    buffer: JByteArray,
     offset: jlong,
     length: jlong,
     position: jlong,
@@ -403,11 +404,11 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWr
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWriteString(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     handle: jlong,
     string: JString,
-    encoding: JString,
+    encoding: jint,
     position: jlong,
     callback: jlong,
 ) {
@@ -415,51 +416,66 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWr
     let handle = unsafe { &mut *handle };
 
     let callback = callback as *const AsyncCallback;
-    let string = get_str(string, "");
-    let encoding = get_str(encoding, "");
+    let string = get_str(&mut env, &string, "");
 
     let on_success = AsyncCallback::clone_from_ptr(callback);
-    let callback = AsyncClosure::<usize, std::io::Error>::new(Box::new(move |success, error| {
-        if let Some(error) = error {
-            on_success.on_error(jni::objects::JValue::Object(
-                error_to_jstring(error).as_obj(),
-            ))
-        } else {
-            on_success.on_success((success.unwrap() as jlong).into())
+
+    match StringEncoding::try_from(encoding) {
+        Ok(encoding) => {
+            let callback = AsyncClosure::<usize, std::io::Error>::new(Box::new(move |success, error| {
+                if let Some(error) = error {
+                    on_success.on_error(jni::objects::JValue::Object(
+                        error_to_jstring(error).as_obj(),
+                    ))
+                } else {
+                    on_success.on_success((success.unwrap() as jlong).into())
+                }
+            }))
+                .into_arc();
+            handle.write_string(&string, encoding, position.try_into().unwrap(), callback);
         }
-    }))
-        .into_arc();
-    handle.write_string(&string, &encoding, position.try_into().unwrap(), callback);
+        Err(error) => {
+            on_success.on_error(env.new_string(error).unwrap().into())
+        }
+    }
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWriteFileWithString(
-    _: JNIEnv,
+    mut env: JNIEnv,
     _: JClass,
     handle: jint,
     data: JString,
-    encoding: JString,
+    encoding: jint,
     callback: jlong,
 ) {
     let handle = handle as *mut FileHandle;
     let handle = unsafe { &mut *handle };
 
     let callback = callback as *const AsyncCallback;
-    let data = get_str(data, "");
-    let encoding = get_str(encoding, "");
+    let data = get_str(&mut env, &data, "");
 
     let on_success = AsyncCallback::clone_from_ptr(callback);
-    let callback = AsyncClosure::<(), std::io::Error>::new(Box::new(move |_, error| {
-        if let Some(error) = error {
-            on_success.on_error(jni::objects::JValue::Object(
-                error_to_jstring(error).as_obj(),
-            ))
-        } else {
-            on_success.on_success(JObject::null().into())
+
+
+    match StringEncoding::try_from(encoding) {
+        Ok(encoding) => {
+            let callback = AsyncClosure::<(), std::io::Error>::new(Box::new(move |_, error| {
+                if let Some(error) = error {
+                    on_success.on_error(jni::objects::JValue::Object(
+                        error_to_jstring(error).as_obj(),
+                    ))
+                } else {
+                    on_success.on_success(JObject::null().into())
+                }
+            }))
+                .into_arc();
+            handle.write_file_with_str(&data, encoding, callback);
         }
-    }))
-        .into_arc();
-    handle.write_file_with_str(&data, &encoding, callback);
+        Err(error) => {
+            on_success.on_error(env.new_string(error).unwrap().into())
+        }
+    }
 }
 
 #[no_mangle]
@@ -467,7 +483,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWr
     env: JNIEnv,
     _: JClass,
     handle: jlong,
-    data: jbyteArray,
+    data: JByteArray,
     callback: jlong,
 ) {
     let handle = handle as *mut FileHandle;
@@ -495,7 +511,7 @@ pub extern "system" fn Java_org_nativescript_node_1compat_fs_FileHandle_nativeWr
     env: JNIEnv,
     _: JClass,
     handle: jlong,
-    buffers: jobjectArray,
+    buffers: JLongArray,
     position: jlong,
     callback: jlong,
 ) {

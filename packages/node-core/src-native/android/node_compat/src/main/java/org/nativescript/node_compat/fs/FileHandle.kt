@@ -2,6 +2,7 @@ package org.nativescript.node_compat.fs
 
 import android.os.ParcelFileDescriptor
 import org.json.JSONObject
+import org.nativescript.node_compat.buffer.Buffer
 import java.io.IOException
 import java.nio.ByteBuffer
 
@@ -11,7 +12,7 @@ class FileHandle {
     internal set
 
   var fd: Int = 0
-  internal set
+    internal set
 
   internal var native: Long = 0
 
@@ -42,281 +43,293 @@ class FileHandle {
   }
 
 
-fun close(callback: AsyncCallback<Void>) {
-  executor.execute(() -> {
-    try {
-      closeSync(this);
-      callback.onSuccess(null);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun appendFile(data: FileHandle, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    boolean error = false;
-    try {
-      appendFileSync(this, data, options);
-    } catch (IOException e) {
-      callback.onError(e);
-      error = true;
-    } finally {
-      if (!error) {
-        callback.onSuccess(null);
-      }
-    }
-  });
-}
-
-fun appendFile(data: String, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    boolean error = false;
-    try {
-      appendFileSync(this, data, options);
-    } catch (IOException e) {
-      callback.onError(e);
-      error = true;
-    } finally {
-      if (!error) {
-        callback.onSuccess(null);
-      }
-    }
-  });
-}
-
-fun appendFile(data: ByteBuffer, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    try {
-      appendFileSync(this, data, options);
-      callback.onSuccess(null);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun appendFile(data: ByteArray, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    try {
-      appendFileSync(this, data, options);
-      callback.onSuccess(null);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun read(buffer: ByteArray, int offset, int length, int position, FileSystem.Callback<Long> callback) {
-  executors.execute(() -> {
-    try {
-      long read = readSync(this, buffer, offset, length, position);
-      callback.onSuccess(read);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun read(buffer: ByteBuffer, offset: Int, length: Int, position: Int, FileSystem.Callback<Long> callback) {
-  executors.execute(() -> {
-    try {
-      long read = readSync(this, buffer, offset, length, position);
-      callback.onSuccess(read);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun stat(FileSystem.Callback<String> callback) {
-  executor.execute(() -> {
-    try {
-      JSONObject json = statSync(this);
-      callback.onSuccess(json.toString());
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun datasync(FileSystem.Callback<Void> callback) {
-  executor.execute(() -> {
-    try {
-      fdatasyncSync(this);
-      callback.onSuccess(null);
-    } catch (Exception e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun sync(FileSystem.Callback<Void> callback) {
-  executor.execute(() -> {
-    try {
-      fsyncSync(this);
-      callback.onSuccess(null);
-    } catch (Exception e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun futimes(atime: Long, mtime: Long, FileSystem.Callback<Void> callback) {
-  executor.execute(() -> {
-    try {
-      futimesSync(this, atime, mtime);
-      callback.onSuccess(null);
-    } catch (Exception e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun copyFile(src: String, dest: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    try {
-      copyFileSync(src, dest);
-      callback.onSuccess(null);
-    } catch (Exception e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun write(data: FileHandle, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    boolean error = false;
-    try {
-      writeSync(this, data, options);
-    } catch (IOException e) {
-      callback.onError(e);
-      error = true;
-    } finally {
-      if (!error) {
-        callback.onSuccess(null);
-      }
-    }
-  });
-}
-
-fun write(data: String, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    boolean error = false;
-    try {
-      writeSync(this, data, options);
-    } catch (IOException e) {
-      callback.onError(e);
-      error = true;
-    } finally {
-      if (!error) {
-        callback.onSuccess(null);
-      }
-    }
-  });
-}
-
-fun write(data: ByteBuffer, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    try {
-      writeSync(this, data, options);
-      callback.onSuccess(null);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-fun write(data: ByteArray, options: String, FileSystem.Callback<Void> callback) {
-  executors.execute(() -> {
-    try {
-      writeSync(this, data, options);
-      callback.onSuccess(null);
-    } catch (IOException e) {
-      callback.onError(e);
-    }
-  });
-}
-
-
-companion object {
-
-  @JvmStatic
-  fun open(path: String, flag: Int,mode: Int, callback: AsyncCallback<FileHandle>): FileHandle? {
-    return nativeOpen(path, flag, mode, callback.native)
+  fun close(callback: AsyncCallback<Void>) {
+    nativeClose(native, callback.native)
   }
 
-  @JvmStatic
-  external fun nativeInit(fd: Int): Long
+  fun appendFile(data: FileHandle, options: String, callback: AsyncCallback<Void>) {
+    //nativeAppend(native, data.native, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeOpen(path: String?, flags: Int, mode: Int, callback: Long): FileHandle?
+  fun appendFile(data: String, options: String, callback: AsyncCallback<Void>) {
+    nativeAppendFileWithString(native, data, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeDispose(fd: Long): Long
+  fun appendFile(data: ByteBuffer, options: String, callback: AsyncCallback<Void>) {
+    //nativeAppendFileWithBuffer(native, data, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeClose(fh: Long)
+  fun appendFile(data: ByteArray, options: String, callback: AsyncCallback<Void>) {
+    nativeAppendFileWithBytes(native, data, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeAppend(fo: Long, fi: Long)
-
-  @JvmStatic
-  external fun nativeAppendString(fh: Long, data: String?)
-
-  @JvmStatic
-  external fun nativeAppendBytes(fh: Long, data: ByteArray?)
-
-  @JvmStatic
-  external fun nativeAppendBuffer(fh: Long, data: ByteBuffer?)
-
-  @JvmStatic
-  external fun nativeRead(
-    fh: Long,
-    buffer: ByteArray?,
+  fun read(
+    buffer: ByteArray,
     offset: Long,
     length: Long,
-    position: Long
-  ): Long
+    position: Long,
+    callback: AsyncCallback<Long>
+  ) {
+    nativeReadWithBytes(native, buffer, offset, length, position, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeReadBuffer(
-    fh: Long,
-    buffer: ByteBuffer?,
+  fun read(
+    buffer: ByteBuffer,
     offset: Long,
     length: Long,
-    position: Long
-  ): Long
+    position: Long,
+    callback: AsyncCallback<Long>
+  ) {
+    nativeRead(native, buffer, offset, length, position, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeWrite(fh: Long, data: Long): Long
+  fun stat(callback: AsyncCallback<FileStat>) {
+    nativeStat(native, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeWriteString(fh: Long, data: String?)
+  fun datasync(callback: AsyncCallback<Void>) {
+    nativeDatasync(native, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeWriteBytes(fh: Long, data: ByteArray?): Long
+  fun sync(callback: AsyncCallback<Void>) {
+    nativeSync(native, callback.native)
+  }
 
-  @JvmStatic
-  external fun nativeWriteBuffer(fh: Long, buffer: ByteBuffer?): Long
+  fun futimes(atime: Long, mtime: Long, callback: AsyncCallback<Void>) {
+  }
 
-  @JvmStatic
-  external fun nativeStat(fh: Long): JSONObject?
+  fun copyFile(src: String, dest: String, callback: AsyncCallback<Void>) {
 
-  @JvmStatic
-  external fun nativeDataSync(fh: Long)
+  }
 
-  @JvmStatic
-  external fun nativeSync(fh: Long)
+  fun write(data: FileHandle, options: String, callback: AsyncCallback<Void>) {
 
-  @JvmStatic
-  external fun nativeFutimes(fh: Long, atime: Long, mtime: Long)
+  }
 
-  @JvmStatic
-  external fun nativeCopyFile(src: String?, dest: String?)
+  fun write(data: String, options: String, callback: AsyncCallback<Void>) {
+    //  nativeWriteString(native, data, )
+  }
 
-  @JvmStatic
-  external fun nativeUnlink(path: String?)
-}
+  fun write(data: ByteBuffer, options: String, callback: AsyncCallback<Void>) {
+    // nativeWrite(native, data, )
+  }
+
+  fun write(data: ByteArray, options: String, callback: AsyncCallback<Void>) {
+    // nativeWriteBytes(native,)
+  }
+
+  fun writev(
+    buffers: Array<Buffer>,
+    position: Long,
+    callback: AsyncCallback<Long>
+  ) {
+    nativeWritev(native, buffers.map { it.native }.toLongArray(), position, callback.native)
+  }
+
+
+  companion object {
+
+    @JvmStatic
+    fun open(path: String, flag: Int, mode: Int, callback: AsyncCallback<FileHandle>) {
+      nativeOpen(path, flag, mode, callback.native)
+    }
+
+    @JvmStatic
+    external fun nativeInit(fd: Int): Long
+
+    @JvmStatic
+    external fun nativeOpenSync(
+
+      fd: Int,
+    ): Long
+
+    @JvmStatic
+    external fun nativeOpen(
+      path: String,
+      flags: Int,
+      mode: Int,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeAppendFileWithBytes(
+
+      handle: Long,
+      bytes: ByteArray,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeAppendFileWithString(
+
+      handle: Long,
+      data: String,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeChmod(
+
+      handle: Long,
+      mode: Int,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeChown(
+
+      handle: Long,
+      uid: Int,
+      gid: Int,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeClose(
+
+      handle: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeDatasync(
+
+      handle: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeGetFd(
+
+      handle: Int,
+    ): Int
+
+    @JvmStatic
+    external fun nativeRead(
+
+      handle: Long,
+      buffer: ByteBuffer,
+      offset: Long,
+      length: Long,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeReadWithBytes(
+
+      handle: Long,
+      buffer: ByteArray,
+      offset: Long,
+      length: Long,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeReadv(
+
+      handle: Long,
+      buffers: LongArray,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeStat(
+
+      handle: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeSync(
+
+      handle: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeTruncate(
+
+      handle: Long,
+      len: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeUtimes(
+
+      handle: Long,
+      atime: Long,
+      mtime: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWrite(
+
+      handle: Long,
+      buffer: ByteBuffer,
+      offset: Long,
+      length: Long,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWriteBytes(
+
+      handle: Long,
+      buffer: ByteArray,
+      offset: Long,
+      length: Long,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWriteString(
+
+      handle: Long,
+      string: String,
+      encoding: Int,
+      position: Long,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWriteFileWithString(
+
+      handle: Int,
+      data: String,
+      encoding: Int,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWriteFileWithBytes(
+
+      handle: Long,
+      data: ByteArray,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWriteFileWithBuffer(
+
+      handle: Long,
+      data: ByteBuffer,
+      callback: Long,
+    )
+
+    @JvmStatic
+    external fun nativeWritev(
+      handle: Long,
+      buffers: LongArray,
+      position: Long,
+      callback: Long,
+    )
+  }
 
 }
