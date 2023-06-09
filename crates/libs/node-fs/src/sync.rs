@@ -133,6 +133,14 @@ pub fn append_file_with_str(fd: c_int, data: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn append_file_with_str_encoding(fd: c_int, data: &str, encoding: StringEncoding) -> std::io::Result<()> {
+    let mut file = unsafe { File::from_raw_fd(fd) };
+    let bytes = Buffer::from_string(CString::new(data).unwrap(), encoding);
+    let _ = file.write(bytes.buffer())?;
+    let _ = file.into_raw_fd();
+    Ok(())
+}
+
 pub fn append_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
     let _ = file.write(data)?;
@@ -154,6 +162,21 @@ pub fn append_file_with_path_str(
     let fd = open(path, flags, mode)?;
     let mut file = unsafe { File::from_raw_fd(fd) };
     let ret = file.write(data.as_bytes()).map(|_| ());
+    let _ = file.into_raw_fd();
+    ret
+}
+
+pub fn append_file_with_path_str_encoding(
+    path: &str,
+    data: &str,
+    encoding: StringEncoding,
+    mode: c_int,
+    flags: c_int,
+) -> std::io::Result<()> {
+    let fd = open(path, flags, mode)?;
+    let mut file = unsafe { File::from_raw_fd(fd) };
+    let buffer = Buffer::from_string(CString::new(data).unwrap(), encoding);
+    let ret = file.write(buffer.buffer()).map(|_| ());
     let _ = file.into_raw_fd();
     ret
 }
@@ -199,7 +222,7 @@ pub fn copy_file(src: &str, dest: &str, flags: c_uint) -> std::io::Result<()> {
     crate::copy_file::copy_file(Path::new(src), Path::new(dest), flags)
 }
 
-pub fn cp(_src: &str, _dest: &str) {
+pub fn cp(_src: &str, _dest: &str, flags: u32) {
     todo!()
     // let src = Path::new(src);
     // let dest = Path::new(dest);

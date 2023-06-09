@@ -26,7 +26,7 @@ pub struct FileStat {
     pub isFIFO: bool,
     pub isFile: bool,
     pub isSocket: bool,
-    pub isSymbolicLink: bool,
+    pub isSymbolicLink: bool
 }
 
 impl Default for FileStat {
