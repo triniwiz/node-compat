@@ -482,7 +482,7 @@ pub(crate) fn make_temp(
     }
 }
 
-pub fn mkdtemp<'a>(prefix: &str) -> std::io::Result<PathBuf> {
+pub fn mkdtemp(prefix: &str) -> std::io::Result<PathBuf> {
     make_temp(None, Some(prefix), None, true)
 }
 
@@ -566,6 +566,29 @@ pub enum ReaddirResult {
     String(CString),
     Buffer(Buffer),
     Type(FileDirent),
+}
+
+impl ReaddirResult {
+    pub fn get_string_value(&self) -> Option<CString> {
+        match &self.0 {
+            ReaddirResult::String(value) => Some(value.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn get_buffer_value(&self) -> Option<Buffer> {
+        match &self.0 {
+            ReaddirResult::Buffer(buffer) => { Some(buffer.clone()) }
+            _ => { None }
+        }
+    }
+
+    pub fn get_type_value(&self) -> Option<FileDirent> {
+        match &self.0 {
+            ReaddirResult::Type(dir) => { Some(dir.clone()) }
+            _ => None
+        }
+    }
 }
 
 pub fn readdir(path: &str, with_file_types: bool, encoding: FsEncodingType) -> io::Result<Vec<ReaddirResult>> {

@@ -12,3 +12,7 @@ pub mod file_handle;
 pub mod file_stat;
 pub mod prelude;
 pub mod sync;
+
+
+pub use prelude::FsEncoding;
+pub use prelude::FsEncodingType;
