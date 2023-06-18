@@ -1,4 +1,6 @@
-use std::ffi::{c_long, c_uint, c_ushort, c_void, CString};
+use std::ffi::{i64, c_uint, c_ushort, c_void, CString};
+use std::os::raw::{c_int, c_long};
+use std::sync::Arc;
 use node_fs::file_dirent::FileDirent;
 use node_fs::prelude::{FsEncodingType, handle_meta};
 use crate::ffi::ReaddirResultType;
@@ -395,13 +397,13 @@ fn fs_fsync_sync(fd: i32) -> Result<(), String> {
 }
 
 fn fs_ftruncate_sync(fd: i32, len: usize) -> Result<(), String> {
-    let len: c_long = len.try_into().map_err(|e| e.to_string())?;
-    node_fs::sync::ftruncate(fd, len).map_err(|e| e.to_string())
+    let len: i64 = len.try_into().map_err(|e| e.to_string())?;
+    node_fs::sync::ftruncate(fd, len as c_long).map_err(|e| e.to_string())
 }
 
 fn fs_futimes_sync(fd: i32, atime: usize, mtime: usize) -> Result<(), String> {
-    let atime: c_long = atime.try_into().map_err(|e| e.to_string())?;
-    let mtime: c_long = mtime.try_into().map_err(|e| e.to_string())?;
+    let atime: i64 = atime.try_into().map_err(|e| e.to_string())?;
+    let mtime: i64 = mtime.try_into().map_err(|e| e.to_string())?;
     node_fs::sync::futimes(fd, atime, mtime).map_err(|e| e.to_string())
 }
 
@@ -413,7 +415,7 @@ fn fs_lchown_sync(path: &str, uid: c_uint, gid: c_uint) -> Result<(), String> {
     node_fs::sync::chown(path, uid, gid).map_err(|e| e.to_string())
 }
 
-fn fs_lutimes_sync(path: &str, atime: c_long, mtime: c_long) -> Result<(), String> {
+fn fs_lutimes_sync(path: &str, atime: i64, mtime: i64) -> Result<(), String> {
     node_fs::sync::lutimes(path, atime, mtime).map_err(|e| e.to_string())
 }
 
@@ -511,10 +513,10 @@ fn fs_read_link_sync(path: &str, encoding: FsEncodingType) -> Result<FsEncoding,
         .map_err(|e| e.to_string())
 }
 
-fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: c_long) -> Result<usize, String> {
+fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: i64) -> Result<usize, String> {
     let mut buffers = buffers.iter().map(|buffer| buffer.0.clone())
         .collect::<Vec<node_buffer::Buffer>>();
-    node_fs::sync::readv(fd, buffers.as_mut_slice(), position)
+    node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
         .map_err(|e| e.to_string())
 }
 
@@ -533,9 +535,9 @@ fn fs_rmdir_sync(
     path: &str,
     max_retries: c_int,
     recursive: bool,
-    retry_delay: c_ulonglong,
+    retry_delay: i64,
 ) -> Result<(), String> {
-    node_fs::sync::rmdir(path, max_retries, recursive, retry_delay)
+    node_fs::sync::rmdir(path, max_retries, recursive, retry_delay.try_into().unwrap())
         .map_err(|e| e.to_string())
 }
 
@@ -543,9 +545,9 @@ fn fs_rm_sync(
     path: &str,
     max_retries: c_int,
     recursive: bool,
-    retry_delay: c_ulonglong,
+    retry_delay: i64,
 ) -> Result<(), String> {
-    node_fs::sync::rm(path, max_retries, recursive, retry_delay)
+    node_fs::sync::rm(path, max_retries, recursive, retry_delay.try_into().unwrap())
         .map_err(|e| e.to_string())
 }
 
@@ -560,8 +562,8 @@ fn fs_symlink_sync(target: &str, path: &str, _type_: &str) -> Result<(), String>
         .map_err(|e| e.to_string())
 }
 
-fn fs_truncate_sync(path: &str, len: c_ulonglong) -> Result<(), String> {
-    node_fs::sync::truncate(path, len)
+fn fs_truncate_sync(path: &str, len: i64) -> Result<(), String> {
+    node_fs::sync::truncate(path, len.try_into().unwrap())
         .map_err(|e| e.to_string())
 }
 
@@ -570,16 +572,10 @@ fn fs_unlink_sync(path: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-// fn unwatchFile(filename){}
-
-fn fs_utimes_sync(path: &str, atime: c_long, mtime: c_long) -> Result<(), String> {
-    node_fs::sync::utimes(path, atime, mtime)
+fn fs_utimes_sync(path: &str, atime: i64, mtime: i64) -> Result<(), String> {
+    node_fs::sync::utimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap())
         .map_err(|e| e.to_string())
 }
-
-// fn watch(){}
-
-// fn watchFile(){}
 
 fn fs_write_sync(
     fd: c_int,
@@ -650,14 +646,54 @@ fn fs_write_file_with_buffer_from_path_sync(
         .map_err(|e| e.to_string())
 }
 
-fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> Result<usize, String> {
+fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: i64) -> Result<usize, String> {
     let mut buffers = buffers.iter().map(|buffer| buffer.clone()).collect::<Vec<node_buffer::Buffer>>();
     node_fs::sync::writev(
-        fd, buffers, position,
+        fd, buffers, position.try_into().unwrap(),
     )
         .map_err(|e| e.to_string())
 }
 
+
+#[derive(Clone, Debug)]
+pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileStat, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncUsizeClosure(Arc<node_fs::a_sync::AsyncClosure<usize, std::io::Error>>);
+
+#[derive(Copy, Clone, Debug)]
+pub struct FileWatchEvent(node_fs::a_sync::FileWatchEvent);
+
+#[derive(Clone, Debug)]
+pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileWatchEvent, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, std::io::Error>>);
+
+
+#[derive(Copy, Clone, Debug)]
+pub struct WatchEvent(node_fs::a_sync::WatchEvent);
+
+#[derive(Clone, Debug)]
+pub struct AsyncWatchClosure(Arc<node_fs::a_sync::AsyncClosure<WatchEvent, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncReaddirClosure(Arc<node_fs::a_sync::AsyncClosure<ReaddirResult, std::io::Error>>);
+
+#[derive(Clone, Debug)]
+pub struct FileDir(node_fs::file_dir::FileDir);
+
+#[derive(Clone, Debug)]
+pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, std::io::Error>>);
 
 #[cxx::bridge(namespace = "org::nativescript::nodecompat")]
 pub mod ffi {
@@ -875,7 +911,7 @@ pub mod ffi {
 
         fn fs_lchown_sync(path: &str, uid: c_uint, gid: c_uint) -> Result<(), String>;
 
-        fn fs_lutimes_sync(path: &str, atime: c_long, mtime: c_long) -> Result<(), String>;
+        fn fs_lutimes_sync(path: &str, atime: i64, mtime: i64) -> Result<(), String>;
 
         fn fs_link_sync(existing_path: &str, new_path: &str) -> Result<(), String>;
 
@@ -909,7 +945,7 @@ pub mod ffi {
 
         fn fs_read_link_sync(path: &str, encoding: FsEncodingType) -> Result<FsEncoding, String>;
 
-        fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: c_long) -> Result<usize, String>;
+        fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: i64) -> Result<usize, String>;
 
         fn fs_real_path_sync(path: &str) -> Result<String, String>;
 
@@ -937,13 +973,7 @@ pub mod ffi {
 
         fn fs_unlink_sync(path: &str) -> Result<(), String>;
 
-// fn unwatchFile(filename){}
-
-        fn fs_utimes(path: &str, atime: c_long, mtime: c_long) -> Result<(), String>;
-
-// fn watch(){}
-
-// fn watchFile(){}
+        fn fs_utimes_sync(path: &str, atime: i64, mtime: i64) -> Result<(), String>;
 
         fn fs_write_sync(
             fd: c_int,
@@ -986,11 +1016,242 @@ pub mod ffi {
             flag: c_int,
         ) -> Result<(), String>;
 
-        fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> Result<usize, String>;
+        fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: i64) -> Result<usize, String>;
     }
-
 
     extern "Rust" {
         // fs async
+
+        type AsyncClosure;
+
+        type AsyncBoolClosure
+
+        type AsyncFileStatClosure;
+
+        type AsyncStringClosure;
+
+        type AsyncUsizeClosure;
+
+        type AsyncFsEncodingClosure;
+
+        type AsyncFileWatchClosure;
+
+        type AsyncWatchClosure;
+
+        type AsyncReaddirClosure;
+
+        type FileDir;
+
+        type AsyncFileDirClosure;
+
+        pub fn access(path: &str, access: i32, callback: AsyncClosure);
+
+        pub fn append_file_with_str(fd: i32, data: &str, callback: AsyncClosure);
+
+        pub fn append_file_with_bytes(fd: i32, data: &Buffer, callback: AsyncClosure);
+
+        pub fn append_file_with_path_str(
+            path: &str,
+            data: &str,
+            mode: i32,
+            flags: i32,
+            callback: AsyncClosure,
+        );
+
+        pub fn append_file_with_path_bytes(
+            path: &str,
+            data: &Buffer,
+            mode: i32,
+            flags: i32,
+            callback: AsyncClosure,
+        );
+
+        pub fn chmod(path: &str, mode: u32, callback: AsyncClosure);
+
+        pub fn chown(path: &str, uid: u32, gid: u32, callback: AsyncClosure);
+
+        pub fn close(fd: i32, callback: AsyncClosure);
+
+        pub fn copy_file(src: &str, dest: &str, flags: u32, callback: AsyncClosure);
+
+        pub fn cp(_src: &str, _dest: &str);
+
+        pub fn exists(path: &str, callback: AsyncBoolClosure);
+
+        pub fn fchmod(fd: i32, mode: u16, callback: AsyncClosure);
+
+        pub fn fchown(fd: i32, uid: u32, gid: u32, callback: AsyncClosure);
+
+        pub fn fdatasync(fd: i32, callback: AsyncClosure);
+
+        pub fn fstat(fd: i32, callback: AsyncFileStatClosure);
+
+        pub fn fsync(fd: i32, callback: AsyncClosure);
+
+        pub fn ftruncate(fd: i32, len: i64, callback: AsyncClosure);
+
+        pub fn futimes(fd: c_int, atime: i64, mtime: i64, callback: AsyncClosure);
+
+        pub fn lchmod(path: &str, mode: c_ushort, callback: AsyncClosure);
+
+        pub fn lchown(path: &str, uid: c_uint, gid: c_uint, callback: AsyncClosure);
+
+        pub fn lutimes(path: &str, atime: i64, mtime: i64, callback: AsyncClosure);
+
+        pub fn link(existing_path: &str, new_path: &str, callback: AsyncClosure);
+
+        pub fn lstat(path: &str, callback: AsyncFileStatClosure);
+
+        pub fn mkdir(path: &str, mode: c_uint, recursive: bool, callback: AsyncClosure);
+
+        pub fn mkdtemp(prefix: &str, callback: AsyncStringClosure);
+
+        pub fn open(path: &str, flags: c_int, mode: c_int, callback: AsyncUsizeClosure);
+
+        pub fn opendir(path: &str, callback: AsyncFileDirClosure);
+
+        pub fn read(
+            fd: c_int,
+            buffer: &mut Buffer,
+            offset: usize,
+            length: usize,
+            position: isize,
+            callback: AsyncUsizeClosure,
+        );
+
+        pub fn readdir(
+            path: &str,
+            with_file_types: bool,
+            encoding: FsEncodingType,
+            callback: AsyncReaddirClosure,
+        );
+
+        pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int, callback: AsyncFsEncodingClosure);
+
+        pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, flags: c_int, callback: AsyncFsEncodingClosure);
+
+        pub fn read_link(path: &str, encoding: FsEncodingType, callback: AsyncFsEncodingClosure);
+
+        pub fn readv(
+            fd: c_int,
+            buffers: Vec<Buffer>,
+            position: i64,
+            callback: AsyncUsizeClosure,
+        );
+
+        pub fn real_path(path: &str, callback: AsyncStringClosure);
+
+        pub fn rename(old_path: &str, new_path: &str, callback: AsyncClosure);
+
+        pub fn rmdir(
+            path: &str,
+            max_retries: c_int,
+            recursive: bool,
+            retry_delay: c_ulonglong,
+            callback: AsyncClosure,
+        );
+
+        pub fn rm(
+            path: &str,
+            max_retries: c_int,
+            recursive: bool,
+            retry_delay: c_ulonglong,
+            callback: AsyncClosure,
+        );
+
+        pub fn stat(path: &str, throw_if_no_entry: bool, callback: AsyncFileStatClosure);
+
+        pub fn symlink(target: &str, path: &str, type_: &str, callback: AsyncClosure);
+
+        pub fn truncate(path: &str, len: c_ulonglong, callback: AsyncClosure);
+
+        pub fn unlink(path: &str, callback: AsyncClosure);
+
+        pub fn unwatch_file(filename: &str);
+
+        pub fn unwatch_file_with_callback(filename: &str, callback: AsyncFileWatchClosure);
+
+        pub fn utimes(path: &str, atime: i64, mtime: i64, callback: AsyncClosure);
+
+        pub fn file_watcher_unref(filename: &str, callback: AsyncFileWatchClosure);
+
+        pub fn file_watcher_ref(filename: &str, callback: AsyncFileWatchClosure);
+
+        pub fn watch(
+            filename: &str,
+            persistent: bool,
+            recursive: bool,
+            encoding: FsEncodingType,
+            callback: AsyncWatchClosure,
+        );
+
+        pub fn watcher_unref(filename: &str, callback: AsyncWatchClosure);
+
+        pub fn watcher_ref(filename: &str, callback: AsyncWatchClosure);
+
+        pub fn watcher_close(
+            filename: &str,
+            callback: AsyncWatchClosure,
+            on_close: AsyncClosure,
+        );
+
+        pub fn watch_file(
+            filename: &str,
+            _bigint: bool,
+            persistent: bool,
+            interval: c_ulong,
+            encoding: FsEncodingType,
+            callback: AsyncFileWatchClosure,
+        );
+
+        pub fn write(
+            fd: c_int,
+            buffer: &Buffer,
+            offset: usize,
+            length: usize,
+            position: isize,
+            callback: AsyncUsizeClosure,
+        );
+
+        pub fn write_string(
+            fd: c_int,
+            string: &str,
+            encoding: StringEncoding,
+            position: isize,
+            callback: AsyncUsizeClosure,
+        );
+
+        pub fn write_file_with_str(
+            fd: c_int,
+            data: &str,
+            encoding: StringEncoding,
+            callback: AsyncClosure,
+        );
+
+        pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: AsyncClosure);
+
+        pub fn write_file_with_str_from_path(
+            path: &str,
+            data: &str,
+            encoding: StringEncoding,
+            mode: c_int,
+            flag: c_int,
+            callback: AsyncClosure,
+        );
+
+        pub fn write_file_with_bytes_from_path(
+            path: &str,
+            data: &Buffer,
+            mode: c_int,
+            flag: c_int,
+            callback: AsyncClosure,
+        );
+
+        pub fn writev(
+            fd: c_int,
+            buffers: Vec<Buffer>,
+            position: i64,
+            callback: AsyncUsizeClosure,
+        );
     }
 }

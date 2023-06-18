@@ -119,7 +119,7 @@ pub(crate) struct FileWatcherItem {
     callbacks: Vec<Arc<AsyncClosure<FileWatchEvent, Error>>>,
     is_alive: AtomicBool,
     persistent: bool,
-    encoding: FsEncodingType
+    encoding: FsEncodingType,
 }
 
 type WatcherMap = Arc<Mutex<HashMap<String, WatcherItem>>>;
@@ -547,14 +547,18 @@ pub fn readdir(
     path: &str,
     with_file_types: bool,
     encoding: FsEncodingType,
-    callback: Box<dyn Fn(Option<Vec<ReaddirResult>>, Option<Error>) + Send>,
+    callback: Arc<AsyncClosure<Vec<ReaddirResult>, Error>>
 ) {
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
         match super::sync::readdir(&path, with_file_types, encoding) {
-            Ok(read) => callback(Some(read), None),
-            Err(error) => callback(None, Some(error)),
+            Ok(read) => {
+                callback.on_success(Some(read))
+            },
+            Err(error) => {
+                callback.on_error(Some(error))
+            },
         }
     });
 }
@@ -904,7 +908,7 @@ pub fn watch(
                         callbacks: vec![callback],
                         is_alive: AtomicBool::new(true),
                         persistent,
-                        encoding
+                        encoding,
                     };
 
                     map.insert(filename.clone(), item);
@@ -1043,6 +1047,7 @@ pub fn watch_file(
     _bigint: bool,
     persistent: bool,
     interval: c_ulong,
+    encoding: FsEncodingType,
     callback: Arc<AsyncClosure<FileWatchEvent, Error>>,
 ) {
     use notify::{PollWatcher, RecursiveMode, Watcher};
@@ -1096,6 +1101,7 @@ pub fn watch_file(
                 callbacks: vec![callback],
                 is_alive: AtomicBool::new(true),
                 persistent,
+                encoding,
             };
 
             map.insert(filename.clone(), item);
