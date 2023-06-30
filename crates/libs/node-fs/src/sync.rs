@@ -32,7 +32,7 @@ use std::os::windows::prelude::FromRawHandle;
 use backoff::Error;
 use backoff::ExponentialBackoff;
 use faccess::PathExt;
-use libc::{c_char, c_int, c_long, c_uint, c_ushort};
+use libc::{c_char, c_int, c_long, c_uint, c_ushort, option};
 use rand::{thread_rng, Rng};
 use node_buffer::{Buffer, get_bytes, StringEncoding};
 
@@ -126,16 +126,27 @@ pub fn access(path: &str, access: c_int) -> std::io::Result<()> {
     path.access(mode)
 }
 
-pub fn append_file_with_str(fd: c_int, data: &str) -> std::io::Result<()> {
-    let mut file = unsafe { File::from_raw_fd(fd) };
-    let _ = file.write(data.as_bytes())?;
-    let _ = file.into_raw_fd();
-    Ok(())
+
+#[derive(Clone, Copy)]
+pub struct AppendFileOptions {
+    encoding: StringEncoding,
+    mode: i32,
+    flags: i32
 }
 
-pub fn append_file_with_str_encoding(fd: c_int, data: &str, encoding: StringEncoding) -> std::io::Result<()> {
+impl Default for AppendFileOptions {
+    fn default() -> Self {
+        Self {
+            encoding: StringEncoding::Utf8,
+            mode: 0o666,
+            flags: FILE_OPEN_OPTIONS_O_APPEND
+        }
+    }
+}
+
+pub fn append_file_with_str(fd: c_int, data: &str, options: AppendFileOptions) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
-    let bytes = Buffer::from_string(CString::new(data).unwrap(), encoding);
+    let bytes = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
     let _ = file.write(bytes.buffer())?;
     let _ = file.into_raw_fd();
     Ok(())
@@ -156,26 +167,11 @@ pub fn append_file_with_buffer(fd: c_int, data: &Buffer) -> std::io::Result<()> 
 pub fn append_file_with_path_str(
     path: &str,
     data: &str,
-    mode: c_int,
-    flags: c_int,
+    options: AppendFileOptions
 ) -> std::io::Result<()> {
-    let fd = open(path, flags, mode)?;
+    let fd = open(path, options.flags, options.mode)?;
     let mut file = unsafe { File::from_raw_fd(fd) };
-    let ret = file.write(data.as_bytes()).map(|_| ());
-    let _ = file.into_raw_fd();
-    ret
-}
-
-pub fn append_file_with_path_str_encoding(
-    path: &str,
-    data: &str,
-    encoding: StringEncoding,
-    mode: c_int,
-    flags: c_int,
-) -> std::io::Result<()> {
-    let fd = open(path, flags, mode)?;
-    let mut file = unsafe { File::from_raw_fd(fd) };
-    let buffer = Buffer::from_string(CString::new(data).unwrap(), encoding);
+    let buffer = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
     let ret = file.write(buffer.buffer()).map(|_| ());
     let _ = file.into_raw_fd();
     ret
@@ -184,10 +180,9 @@ pub fn append_file_with_path_str_encoding(
 pub fn append_file_with_path_bytes(
     path: &str,
     data: &[u8],
-    mode: c_int,
-    flags: c_int,
+    options: AppendFileOptions
 ) -> std::io::Result<()> {
-    let fd = open(path, flags, mode)?;
+    let fd = open(path, options.flags, options.mode)?;
     let mut file = unsafe { File::from_raw_fd(fd) };
     let ret = file.write(data).map(|_| ());
     let _ = file.into_raw_fd();
@@ -197,11 +192,10 @@ pub fn append_file_with_path_bytes(
 pub fn append_file_with_path_buffer(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flags: c_int,
+    options: AppendFileOptions
 ) -> std::io::Result<()> {
     let data = data.buffer();
-    append_file_with_path_bytes(path, data, mode, flags)
+    append_file_with_path_bytes(path, data, options)
 }
 
 pub fn chmod(path: &str, mode: c_uint) -> std::io::Result<()> {
@@ -424,15 +418,32 @@ pub fn lstat(path: &str) -> std::io::Result<std::fs::Metadata> {
     fs::metadata(path)
 }
 
-pub fn mkdir(path: &str, mode: c_uint, recursive: bool) -> std::io::Result<()> {
+
+
+#[derive(Copy, Clone)]
+struct MkDirOptions {
+    mode: u32,
+    recursive: bool
+}
+
+impl Default for MkDirOptions {
+    fn default() -> Self {
+        Self {
+            mode: 0o777,
+            recursive: false
+        }
+    }
+}
+
+pub fn mkdir(path: &str, options: MkDirOptions) -> std::io::Result<()> {
     let path = Path::new(&path);
 
     let mut builder = std::fs::DirBuilder::new();
-    builder.recursive(recursive);
+    builder.recursive(options.recursive);
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
-        builder.mode(mode);
+        builder.mode(options.mode);
     }
     builder.create(&path)
 }
@@ -443,10 +454,17 @@ pub(crate) fn make_temp(
     prefix: Option<&str>,
     suffix: Option<&str>,
     is_dir: bool,
+    options: MkdTempOptions
 ) -> std::io::Result<std::path::PathBuf> {
-    let prefix_ = prefix.unwrap_or("");
+    let prefix_ = prefix
+        .map(|data| {
+            let buffer = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
+            buffer.as_string(None, None, None)
+        })
+        .unwrap_or_default();
+
     let suffix_ = suffix.unwrap_or("");
-    let mut buf: std::path::PathBuf = match dir {
+    let mut buf: PathBuf = match dir {
         Some(p) => p.to_path_buf(),
         None => std::env::temp_dir(),
     }
@@ -457,7 +475,7 @@ pub(crate) fn make_temp(
         buf.set_file_name(format!("{}{:08x}{}", prefix_, unique, suffix_));
         let r = if is_dir {
             #[allow(unused_mut)]
-                let mut builder = std::fs::DirBuilder::new();
+                let mut builder = fs::DirBuilder::new();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::DirBuilderExt;
@@ -482,15 +500,44 @@ pub(crate) fn make_temp(
     }
 }
 
-pub fn mkdtemp(prefix: &str) -> std::io::Result<PathBuf> {
-    make_temp(None, Some(prefix), None, true)
+#[derive(Copy, Clone)]
+pub struct MkdTempOptions {
+    encoding: StringEncoding
+}
+
+impl Default for MkdTempOptions {
+    fn default() -> Self {
+        Self {encoding: StringEncoding::Utf8}
+    }
+}
+
+pub fn mkdtemp(prefix: &str, options: MkdTempOptions) -> std::io::Result<PathBuf> {
+    make_temp(None, Some(prefix), None, true, options)
 }
 
 pub fn open(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
     open_path(path, flags, mode)
 }
 
-pub fn opendir(path: &str) -> io::Result<FileDir> {
+
+#[derive(Copy, Clone)]
+pub struct OpenDirOptions {
+    encoding: StringEncoding,
+    buffer_size: usize,
+    recursive: bool
+}
+
+impl Default for OpenDirOptions {
+    fn default() -> Self {
+        Self {
+            encoding: StringEncoding::Utf8,
+            buffer_size: 32,
+            recursive: false
+        }
+    }
+}
+
+pub fn opendir(path: &str, options: OpenDirOptions) -> io::Result<FileDir> {
     let c_path = CString::new(path)?;
     let dir = unsafe { libc::opendir(c_path.as_ptr()) };
     if dir.is_null() {
