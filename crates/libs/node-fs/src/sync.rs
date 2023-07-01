@@ -47,30 +47,30 @@ use crate::{
 };
 use crate::prelude::{FsEncoding, FsEncodingType};
 
-fn file_from_path(path: &str, flags: c_int, mode: c_int) -> std::io::Result<File> {
+fn file_from_path(path: &str, flag: c_int, mode: c_int) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
 
-    if (flags & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
+    if (flag & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
         options.create(true);
     }
 
-    if (flags & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
+    if (flag & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
         options.read(true);
     }
 
-    if (flags & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
+    if (flag & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
         options.write(true);
     }
 
-    if (flags & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
+    if (flag & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
         options.append(true);
     }
 
-    if (flags & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
+    if (flag & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
         options.truncate(true);
     }
 
-    if (flags & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
+    if (flag & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
         options.create_new(true);
     }
 
@@ -80,8 +80,8 @@ fn file_from_path(path: &str, flags: c_int, mode: c_int) -> std::io::Result<File
     options.open(path)
 }
 
-pub fn open_path(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
-    let file = file_from_path(path, flags, mode)?;
+pub fn open_path(path: &str, flag: c_int, mode: c_int) -> std::io::Result<RawFd> {
+    let file = file_from_path(path, flag, mode)?;
     Ok(file.into_raw_fd())
 }
 
@@ -98,10 +98,10 @@ pub fn open_handle_with_fd(fd: i32) -> std::io::Result<FileHandle> {
 
 pub fn open_handle_with_path(
     path: &str,
-    flags: c_int,
+    flag: c_int,
     mode: c_int,
 ) -> std::io::Result<FileHandle> {
-    file_from_path(path, flags, mode).map(|v| FileHandle::new(v))
+    file_from_path(path, flag, mode).map(|v| FileHandle::new(v))
 }
 
 pub fn access(path: &str, access: c_int) -> std::io::Result<()> {
@@ -131,7 +131,7 @@ pub fn access(path: &str, access: c_int) -> std::io::Result<()> {
 pub struct AppendFileOptions {
     encoding: StringEncoding,
     mode: i32,
-    flags: i32
+    flag: i32,
 }
 
 impl Default for AppendFileOptions {
@@ -139,7 +139,7 @@ impl Default for AppendFileOptions {
         Self {
             encoding: StringEncoding::Utf8,
             mode: 0o666,
-            flags: FILE_OPEN_OPTIONS_O_APPEND
+            flag: FILE_OPEN_OPTIONS_O_APPEND,
         }
     }
 }
@@ -167,9 +167,9 @@ pub fn append_file_with_buffer(fd: c_int, data: &Buffer) -> std::io::Result<()> 
 pub fn append_file_with_path_str(
     path: &str,
     data: &str,
-    options: AppendFileOptions
+    options: AppendFileOptions,
 ) -> std::io::Result<()> {
-    let fd = open(path, options.flags, options.mode)?;
+    let fd = open(path, options.flag, options.mode)?;
     let mut file = unsafe { File::from_raw_fd(fd) };
     let buffer = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
     let ret = file.write(buffer.buffer()).map(|_| ());
@@ -180,9 +180,9 @@ pub fn append_file_with_path_str(
 pub fn append_file_with_path_bytes(
     path: &str,
     data: &[u8],
-    options: AppendFileOptions
+    options: AppendFileOptions,
 ) -> std::io::Result<()> {
-    let fd = open(path, options.flags, options.mode)?;
+    let fd = open(path, options.flag, options.mode)?;
     let mut file = unsafe { File::from_raw_fd(fd) };
     let ret = file.write(data).map(|_| ());
     let _ = file.into_raw_fd();
@@ -192,7 +192,7 @@ pub fn append_file_with_path_bytes(
 pub fn append_file_with_path_buffer(
     path: &str,
     data: &Buffer,
-    options: AppendFileOptions
+    options: AppendFileOptions,
 ) -> std::io::Result<()> {
     let data = data.buffer();
     append_file_with_path_bytes(path, data, options)
@@ -212,11 +212,11 @@ pub fn close_fd(fd: c_int) {
     }
 }
 
-pub fn copy_file(src: &str, dest: &str, flags: c_uint) -> std::io::Result<()> {
-    crate::copy_file::copy_file(Path::new(src), Path::new(dest), flags)
+pub fn copy_file(src: &str, dest: &str, flag: c_uint) -> std::io::Result<()> {
+    crate::copy_file::copy_file(Path::new(src), Path::new(dest), flag)
 }
 
-pub fn cp(_src: &str, _dest: &str, flags: u32) {
+pub fn cp(_src: &str, _dest: &str, flag: u32) {
     todo!()
     // let src = Path::new(src);
     // let dest = Path::new(dest);
@@ -419,18 +419,17 @@ pub fn lstat(path: &str) -> std::io::Result<std::fs::Metadata> {
 }
 
 
-
-#[derive(Copy, Clone)]
-struct MkDirOptions {
+#[derive(Copy, Clone, Debug)]
+pub struct MkDirOptions {
     mode: u32,
-    recursive: bool
+    recursive: bool,
 }
 
 impl Default for MkDirOptions {
     fn default() -> Self {
         Self {
             mode: 0o777,
-            recursive: false
+            recursive: false,
         }
     }
 }
@@ -454,7 +453,7 @@ pub(crate) fn make_temp(
     prefix: Option<&str>,
     suffix: Option<&str>,
     is_dir: bool,
-    options: MkdTempOptions
+    options: MkdTempOptions,
 ) -> std::io::Result<std::path::PathBuf> {
     let prefix_ = prefix
         .map(|data| {
@@ -502,12 +501,12 @@ pub(crate) fn make_temp(
 
 #[derive(Copy, Clone)]
 pub struct MkdTempOptions {
-    encoding: StringEncoding
+    encoding: StringEncoding,
 }
 
 impl Default for MkdTempOptions {
     fn default() -> Self {
-        Self {encoding: StringEncoding::Utf8}
+        Self { encoding: StringEncoding::Utf8 }
     }
 }
 
@@ -515,8 +514,8 @@ pub fn mkdtemp(prefix: &str, options: MkdTempOptions) -> std::io::Result<PathBuf
     make_temp(None, Some(prefix), None, true, options)
 }
 
-pub fn open(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
-    open_path(path, flags, mode)
+pub fn open(path: &str, flag: c_int, mode: c_int) -> std::io::Result<RawFd> {
+    open_path(path, flag, mode)
 }
 
 
@@ -524,7 +523,7 @@ pub fn open(path: &str, flags: c_int, mode: c_int) -> std::io::Result<RawFd> {
 pub struct OpenDirOptions {
     encoding: StringEncoding,
     buffer_size: usize,
-    recursive: bool
+    recursive: bool,
 }
 
 impl Default for OpenDirOptions {
@@ -532,7 +531,7 @@ impl Default for OpenDirOptions {
         Self {
             encoding: StringEncoding::Utf8,
             buffer_size: 32,
-            recursive: false
+            recursive: false,
         }
     }
 }
@@ -638,17 +637,34 @@ impl ReaddirResult {
     }
 }
 
-pub fn readdir(path: &str, with_file_types: bool, encoding: FsEncodingType) -> io::Result<Vec<ReaddirResult>> {
+#[derive(Copy, Clone, Debug)]
+pub struct ReaddirOptions {
+    with_file_types: bool,
+    encoding: FsEncodingType,
+    recursive: bool,
+}
+
+impl Default for ReaddirOptions {
+    fn default() -> Self {
+        Self {
+            with_file_types: false,
+            encoding: FsEncodingType::Utf8,
+            recursive: false,
+        }
+    }
+}
+
+pub fn readdir(path: &str, options: ReaddirOptions) -> io::Result<Vec<ReaddirResult>> {
     let read = fs::read_dir(path)?;
     read.map(|entry| {
         let dir = entry?;
-        if with_file_types {
+        if options.with_file_types {
             ReaddirResult::Type(FileDirent::new_regular(dir))
         } else {
             let buffer = Buffer::from_string(
                 CString::new(dir.file_name().to_string_lossy().to_string()).unwrap(), StringEncoding::Utf8,
             );
-            match encoding {
+            match options.encoding {
                 FsEncodingType::Ascii => {
                     CString::new(
                         buffer.as_string(Some(StringEncoding::Ascii), None, None)
@@ -686,7 +702,32 @@ pub fn readdir(path: &str, with_file_types: bool, encoding: FsEncodingType) -> i
 }
 
 
-fn read_file_with_file(mut file: File, encoding: FsEncodingType) -> std::io::Result<FsEncoding> {
+#[derive(Copy, Clone, Debug)]
+pub struct ReadFileOptions {
+    flag: i32,
+    encoding: FsEncodingType,
+}
+
+impl Default for ReadFileOptions {
+    fn default() -> Self {
+        Self {
+            flag: FILE_OPEN_OPTIONS_O_RDONLY,
+            encoding: FsEncodingType::Buffer,
+        }
+    }
+}
+
+impl ReadFileOptions {
+    pub fn encoding(&self) -> FsEncodingType {
+        self.encoding
+    }
+
+    pub fn set_encoding(&mut self, encoding: FsEncodingType) {
+        self.encoding = encoding
+    }
+}
+
+fn read_file_with_file(file: &mut File, options: ReadFileOptions) -> std::io::Result<FsEncoding> {
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)?;
     let result = Buffer::from_vec(buf);
@@ -733,17 +774,29 @@ fn read_file_with_file(mut file: File, encoding: FsEncodingType) -> std::io::Res
     Ok(result)
 }
 
-pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int) -> std::io::Result<FsEncoding> {
-    let file = file_from_path(path, flags, 0)?;
-    read_file_with_file(file, encoding)
+pub fn read_file(path: &str, options: ReadFileOptions) -> std::io::Result<FsEncoding> {
+    let mut file = file_from_path(path, options.flag, 0)?;
+    read_file_with_file(&mut file, options)
 }
 
-pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, _flags: i32) -> std::io::Result<FsEncoding> {
-    let file = unsafe { File::from_raw_fd(fd) };
-    read_file_with_file(file, encoding)
+pub fn read_file_with_fd(fd: c_int, options: ReadFileOptions) -> std::io::Result<FsEncoding> {
+    let mut file = unsafe { File::from_raw_fd(fd) };
+    read_file_with_file(&mut file, options)
 }
 
-pub fn read_link(path: &str, encoding: FsEncodingType) -> std::io::Result<FsEncoding> {
+
+#[derive(Copy, Clone, Debug)]
+pub struct ReadLinkOptions {
+    encoding: FsEncodingType,
+}
+
+impl Default for ReadLinkOptions {
+    fn default() -> Self {
+        Self { encoding: FsEncodingType::Utf8 }
+    }
+}
+
+pub fn read_link(path: &str, options: ReadLinkOptions) -> std::io::Result<FsEncoding> {
     let result = fs::read_link(path)?;
 
     #[cfg(unix)]
@@ -757,7 +810,7 @@ pub fn read_link(path: &str, encoding: FsEncodingType) -> std::io::Result<FsEnco
         result
     )?;
     let buffer = Buffer::from_string(result, StringEncoding::Utf8);
-    let result = match encoding {
+    let result = match options.encoding {
         FsEncodingType::Ascii => {
             buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
         }
@@ -820,24 +873,61 @@ pub fn readv_raw(
     readv(fd, slice_buf.as_mut_slice(), position)
 }
 
-pub fn real_path(path: &str) -> std::io::Result<std::path::PathBuf> {
-    std::fs::canonicalize(path)
+
+#[derive(Copy, Clone, Debug)]
+pub struct RealPathOptions {
+    encoding: StringEncoding,
+}
+
+impl Default for RealPathOptions {
+    fn default() -> Self {
+        Self { encoding: StringEncoding::Utf8 }
+    }
+}
+
+pub fn real_path(path: &str, options: RealPathOptions) -> std::io::Result<std::path::PathBuf> {
+    match options.encoding {
+        StringEncoding::Utf8 => {
+            std::fs::canonicalize(path)
+        }
+        _ => {
+            let buffer = Buffer::from_string(CString::new(path).unwrap(), options.encoding);
+            let path = buffer.as_string(None, None, None);
+            std::fs::canonicalize(path)
+        }
+    }
 }
 
 pub fn rename(old_path: &str, new_path: &str) -> std::io::Result<()> {
     fs::rename(Path::new(old_path), Path::new(new_path))
 }
 
-pub fn rmdir(
-    path: &str,
-    max_retries: c_int,
+
+#[derive(Copy, Clone, Debug)]
+pub struct RmDirOptions {
+    max_retries: i32,
     recursive: bool,
     retry_delay: c_ulonglong,
+}
+
+impl Default for RmDirOptions {
+    fn default() -> Self {
+        Self {
+            max_retries: 0,
+            recursive: false,
+            retry_delay: 100,
+        }
+    }
+}
+
+pub fn rmdir(
+    path: &str,
+    options: RmDirOptions,
 ) -> Result<(), node_core::error::AnyError> {
-    if !recursive {
+    if !options.recursive {
         fs::remove_dir(path).map_err(|err| node_core::error::custom_error("", err.to_string()))
     } else {
-        let mut max_retries_count = AtomicI32::new(max_retries);
+        let mut max_retries_count = AtomicI32::new(options.max_retries);
         let op = || {
             fs::remove_dir_all(path).map(|_| ()).map_err(|e| {
                 if max_retries != 0 {
@@ -853,7 +943,7 @@ pub fn rmdir(
                 if error_string.contains("too many open files") {
                     return Error::Transient {
                         err: e,
-                        retry_after: Some(Duration::from_millis(retry_delay)),
+                        retry_after: Some(Duration::from_millis(options.retry_delay)),
                     };
                 }
 
@@ -872,16 +962,33 @@ pub fn rmdir(
     }
 }
 
-pub fn rm(
-    path: &str,
-    max_retries: c_int,
+#[derive(Copy, Clone, Debug)]
+pub struct RmOptions {
+    force: bool,
+    max_retries: i32,
     recursive: bool,
     retry_delay: c_ulonglong,
+}
+
+impl Default for RmOptions {
+    fn default() -> Self {
+        Self {
+            force: false,
+            max_retries: 0,
+            recursive: false,
+            retry_delay: 100,
+        }
+    }
+}
+
+pub fn rm(
+    path: &str,
+    options: RmOptions,
 ) -> Result<(), node_core::error::AnyError> {
-    if !recursive {
+    if !options.recursive {
         fs::remove_file(path).map_err(|err| node_core::error::custom_error("", err.to_string()))
     } else {
-        let mut max_retries_count = AtomicI32::new(max_retries);
+        let mut max_retries_count = AtomicI32::new(options.max_retries);
         let op = || {
             fs::remove_file(path).map_err(|e| {
                 if max_retries != 0 {
@@ -897,7 +1004,7 @@ pub fn rm(
                 if error_string.contains("too many open files") {
                     return Error::Transient {
                         err: e,
-                        retry_after: Some(Duration::from_millis(retry_delay)),
+                        retry_after: Some(Duration::from_millis(options.retry_delay)),
                     };
                 }
 
@@ -964,28 +1071,34 @@ pub fn utimes(path: &str, atime: c_long, mtime: c_long) -> std::io::Result<()> {
 
 // pub fn watchFile(){}
 
-pub fn write(
-    fd: c_int,
-    buffer: &[u8],
+
+#[derive(Copy, Clone, Debug)]
+pub struct WriteOptions {
     offset: usize,
     length: usize,
     position: isize,
+}
+
+pub fn write(
+    fd: c_int,
+    buffer: &[u8],
+    options: WriteOptions,
 ) -> std::io::Result<usize> {
     let mut file = unsafe { File::from_raw_fd(fd) };
     let new_position = file.stream_position().unwrap_or_default();
     let buffer_len = buffer.len();
-    let result = if length < buffer_len {
-        let tmp_buf = &buffer[offset..];
-        let buf = &tmp_buf[..length];
+    let result = if options.length < buffer_len {
+        let tmp_buf = &buffer[options.offset..];
+        let buf = &tmp_buf[..options.length];
         if position == -1 {
             file.write(buf)
         } else {
-            file.write_at(buffer, position as u64)
+            file.write_at(buffer, options.position as u64)
         }
     } else if position == -1 {
         file.write(buffer)
     } else {
-        file.write_at(buffer, position as u64)
+        file.write_at(buffer, options.position as u64)
     };
 
     let ret = match result {
@@ -1033,15 +1146,33 @@ pub fn write_string(
     ret
 }
 
-pub fn write_file_with_str(fd: c_int, data: &str, encoding: StringEncoding) -> std::io::Result<()> {
+
+#[derive(Copy, Clone, Debug)]
+pub struct WriteFileOptions {
+    encoding: StringEncoding,
+    mode: i32,
+    flag: i32,
+}
+
+impl Default for WriteFileOptions {
+    fn default() -> Self {
+        Self {
+            encoding: StringEncoding::Utf8,
+            mode: 0o666,
+            flag: FILE_OPEN_OPTIONS_O_WRONLY,
+        }
+    }
+}
+
+pub fn write_file_with_str(fd: c_int, data: &str, options: WriteFileOptions) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
-    let data = get_bytes(data, encoding);
+    let data = get_bytes(data, options.encoding);
     let ret = file.write(data.as_slice());
     let _ = file.into_raw_fd();
     ret.map(|_| ())
 }
 
-pub fn write_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
+pub fn write_file_with_bytes(fd: c_int, data: &[u8], options: WriteFileOptions) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
     let ret = file.write(data);
     let _ = file.into_raw_fd();
@@ -1051,40 +1182,38 @@ pub fn write_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
 pub fn write_file_with_str_from_path(
     path: &str,
     data: &str,
-    encoding: StringEncoding,
-    mode: c_int,
-    flag: c_int,
+    options: WriteFileOptions,
 ) -> std::io::Result<()> {
-    let mut options = OpenOptions::new();
-    if (flag & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
-        options.create(true);
+    let mut opts = OpenOptions::new();
+    if (options.flag & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
+        opts.create(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
-        options.read(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
+        opts.read(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
-        options.write(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
+        opts.write(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
-        options.append(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
+        opts.append(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
-        options.truncate(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
+        opts.truncate(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
-        options.create_new(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
+        opts.create_new(true);
     }
 
     if mode != 0 {
-        options.mode(mode as u32);
+        opts.mode(options.mode as u32);
     }
 
-    let mut file = options.open(path)?;
+    let mut file = opts.open(path)?;
     let data = get_bytes(data, encoding);
     file.write(data.as_slice()).map(|_| ())
 }
@@ -1092,39 +1221,38 @@ pub fn write_file_with_str_from_path(
 pub fn write_file_with_bytes_from_path(
     path: &str,
     data: &[u8],
-    mode: c_int,
-    flag: c_int,
+    options: WriteFileOptions,
 ) -> std::io::Result<()> {
-    let mut options = OpenOptions::new();
-    if (flag & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
-        options.create(true);
+    let mut opts = OpenOptions::new();
+    if (options.flag & FILE_OPEN_OPTIONS_O_CREAT) == FILE_OPEN_OPTIONS_O_CREAT {
+        opts.create(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
-        options.read(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_RDONLY) == FILE_OPEN_OPTIONS_O_RDONLY {
+        opts.read(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
-        options.write(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_WRONLY) == FILE_OPEN_OPTIONS_O_WRONLY {
+        opts.write(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
-        options.append(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_APPEND) == FILE_OPEN_OPTIONS_O_APPEND {
+        opts.append(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
-        options.truncate(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_TRUNC) == FILE_OPEN_OPTIONS_O_TRUNC {
+        opts.truncate(true);
     }
 
-    if (flag & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
-        options.create_new(true);
+    if (options.flag & FILE_OPEN_OPTIONS_O_EXCL) == FILE_OPEN_OPTIONS_O_EXCL {
+        opts.create_new(true);
     }
 
-    if mode != 0 {
-        options.mode(mode as u32);
+    if options.mode != 0 {
+        opts.mode(mode as u32);
     }
 
-    let mut file = options.open(path)?;
+    let mut file = opts.open(path)?;
 
     file.write(data).map(|_| ())
 }
@@ -1132,10 +1260,9 @@ pub fn write_file_with_bytes_from_path(
 pub fn write_file_with_buffer_from_path(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flag: c_int,
+    options: WriteFileOptions,
 ) -> std::io::Result<()> {
-    write_file_with_bytes_from_path(path, data.buffer(), mode, flag)
+    write_file_with_bytes_from_path(path, data.buffer(), options)
 }
 
 pub fn writev(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> std::io::Result<usize> {

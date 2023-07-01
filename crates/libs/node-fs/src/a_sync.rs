@@ -24,7 +24,7 @@ use crate::file_dir::FileDir;
 use crate::file_dirent::FileDirent;
 use crate::file_stat::FileStat;
 use crate::prelude::{FsEncoding, FsEncodingType, handle_meta};
-use crate::sync::{open_path, ReaddirResult};
+use crate::sync::{AppendFileOptions, MkDirOptions, MkdTempOptions, open_path, OpenDirOptions, ReaddirOptions, ReaddirResult, ReadFileOptions, ReadLinkOptions, RealPathOptions, RmDirOptions, RmOptions, WriteFileOptions, WriteOptions};
 
 pub type OnSuccessCallback = extern "C" fn(result: Option<NonNull<c_void>>);
 
@@ -149,10 +149,10 @@ pub fn access(path: &str, access: c_int, callback: Arc<AsyncClosure<(), Error>>)
     });
 }
 
-pub fn append_file_with_str(fd: c_int, data: &str, callback: Arc<AsyncClosure<(), Error>>) {
+pub fn append_file_with_str(fd: c_int, data: &str, options: AppendFileOptions, callback: Arc<AsyncClosure<(), Error>>) {
     let data = data.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::append_file_with_str(fd, &data) {
+        match super::sync::append_file_with_str(fd, &data, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -180,14 +180,13 @@ pub fn append_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosu
 pub fn append_file_with_path_str(
     path: &str,
     data: &str,
-    mode: c_int,
-    flags: c_int,
+    options: AppendFileOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
     let data = data.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::append_file_with_path_str(&path, &data, mode, flags) {
+        match super::sync::append_file_with_path_str(&path, &data, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -201,14 +200,13 @@ pub fn append_file_with_path_str(
 pub fn append_file_with_path_bytes(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flags: c_int,
+    options: AppendFileOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let data = data.clone();
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::append_file_with_path_bytes(&path, data.buffer(), mode, flags) {
+        match super::sync::append_file_with_path_bytes(&path, data.buffer(), options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -463,10 +461,10 @@ pub fn lstat(path: &str, callback: Arc<AsyncClosure<FileStat, Error>>) {
     });
 }
 
-pub fn mkdir(path: &str, mode: c_uint, recursive: bool, callback: Arc<AsyncClosure<(), Error>>) {
+pub fn mkdir(path: &str, options: MkDirOptions, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::mkdir(&path, mode, recursive) {
+        match super::sync::mkdir(&path, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -477,11 +475,11 @@ pub fn mkdir(path: &str, mode: c_uint, recursive: bool, callback: Arc<AsyncClosu
     });
 }
 
-pub fn mkdtemp(prefix: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
+pub fn mkdtemp(prefix: &str, options: MkdTempOptions, callback: Arc<AsyncClosure<PathBuf, Error>>) {
     let prefix = prefix.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::make_temp(None, Some(&prefix), None, false) {
+        match super::sync::make_temp(None, Some(&prefix), None, false, options) {
             Ok(buf) => {
                 callback.on_success(Some(buf));
             }
@@ -507,10 +505,10 @@ pub fn open(path: &str, flags: c_int, mode: c_int, callback: Arc<AsyncClosure<c_
     });
 }
 
-pub fn opendir(path: &str, callback: Arc<AsyncClosure<FileDir, Error>>) {
+pub fn opendir(path: &str, options: OpenDirOptions, callback: Arc<AsyncClosure<FileDir, Error>>) {
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::opendir(&path) {
+        match super::sync::opendir(&path, options) {
             Ok(fd) => {
                 callback.on_success(Some(fd));
             }
@@ -545,28 +543,27 @@ pub fn read(
 
 pub fn readdir(
     path: &str,
-    with_file_types: bool,
-    encoding: FsEncodingType,
-    callback: Arc<AsyncClosure<Vec<ReaddirResult>, Error>>
+    options: ReaddirOptions,
+    callback: Arc<AsyncClosure<Vec<ReaddirResult>, Error>>,
 ) {
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::readdir(&path, with_file_types, encoding) {
+        match super::sync::readdir(&path, options) {
             Ok(read) => {
                 callback.on_success(Some(read))
-            },
+            }
             Err(error) => {
                 callback.on_error(Some(error))
-            },
+            }
         }
     });
 }
 
-pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
+pub fn read_file(path: &str, options: ReadFileOptions, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::read_file(&path, encoding, flags) {
+        match super::sync::read_file(&path, options) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -577,9 +574,9 @@ pub fn read_file(path: &str, encoding: FsEncodingType, flags: c_int, callback: A
     });
 }
 
-pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, flags: c_int, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
+pub fn read_file_with_fd(fd: c_int, options: ReadFileOptions, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let _ = node_core::thread::spawn(move || {
-        match super::sync::read_file_with_fd(fd, encoding, flags) {
+        match super::sync::read_file_with_fd(fd, options) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -590,10 +587,10 @@ pub fn read_file_with_fd(fd: c_int, encoding: FsEncodingType, flags: c_int, call
     });
 }
 
-pub fn read_link(path: &str, encoding: FsEncodingType, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
+pub fn read_link(path: &str, options: ReadLinkOptions, callback: Arc<AsyncClosure<FsEncoding, Error>>) {
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::read_link(&path, encoding) {
+        match super::sync::read_link(&path, options) {
             Ok(read) => {
                 callback.on_success(Some(read));
             }
@@ -645,10 +642,10 @@ pub fn readv_raw(
     });
 }
 
-pub fn real_path(path: &str, callback: Arc<AsyncClosure<PathBuf, Error>>) {
+pub fn real_path(path: &str, options: RealPathOptions, callback: Arc<AsyncClosure<PathBuf, Error>>) {
     let path = path.to_string();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::real_path(&path) {
+        match super::sync::real_path(&path, options) {
             Ok(buf) => {
                 callback.on_success(Some(buf));
             }
@@ -676,15 +673,13 @@ pub fn rename(old_path: &str, new_path: &str, callback: Arc<AsyncClosure<(), Err
 
 pub fn rmdir(
     path: &str,
-    max_retries: c_int,
-    recursive: bool,
-    retry_delay: c_ulonglong,
+    options: RmDirOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::rmdir(&path, max_retries, recursive, retry_delay) {
+        match super::sync::rmdir(&path, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -698,15 +693,13 @@ pub fn rmdir(
 
 pub fn rm(
     path: &str,
-    max_retries: c_int,
-    recursive: bool,
-    retry_delay: c_ulonglong,
+    options: RmOptions,
     callback: Arc<AsyncClosure<(), node_core::error::AnyError>>,
 ) {
     let path = path.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::rm(&path, max_retries, recursive, retry_delay) {
+        match super::sync::rm(&path, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1173,14 +1166,12 @@ pub fn watch_file(
 pub fn write(
     fd: c_int,
     buffer: &Buffer,
-    offset: usize,
-    length: usize,
-    position: isize,
+    options: WriteOptions,
     callback: Arc<AsyncClosure<usize, Error>>,
 ) {
     let buffer = buffer.clone();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write(fd, buffer.buffer(), offset, length, position) {
+        match super::sync::write(fd, buffer.buffer(), options) {
             Ok(wrote) => {
                 callback.on_success(Some(wrote));
             }
@@ -1215,13 +1206,13 @@ pub fn write_string(
 pub fn write_file_with_str(
     fd: c_int,
     data: &str,
-    encoding: StringEncoding,
+    options: WriteFileOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let data = data.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_file_with_str(fd, &data, encoding) {
+        match super::sync::write_file_with_str(fd, &data, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1232,10 +1223,10 @@ pub fn write_file_with_str(
     });
 }
 
-pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosure<(), Error>>) {
+pub fn write_file_with_bytes(fd: c_int, data: &Buffer, options: WriteFileOptions, callback: Arc<AsyncClosure<(), Error>>) {
     let data = data.clone();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_file_with_bytes(fd, data.buffer()) {
+        match super::sync::write_file_with_bytes(fd, data.buffer(), options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1249,16 +1240,14 @@ pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosur
 pub fn write_file_with_str_from_path(
     path: &str,
     data: &str,
-    encoding: StringEncoding,
-    mode: c_int,
-    flag: c_int,
+    options: WriteFileOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
     let data = data.to_string();
 
     let _ = node_core::thread::spawn(move || {
-        match super::sync::write_file_with_str_from_path(&path, &data, encoding, mode, flag) {
+        match super::sync::write_file_with_str_from_path(&path, &data, options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1272,8 +1261,7 @@ pub fn write_file_with_str_from_path(
 pub fn write_file_with_bytes_from_path(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flag: c_int,
+    options: WriteFileOptions,
     callback: Arc<AsyncClosure<(), Error>>,
 ) {
     let path = path.to_string();
@@ -1283,8 +1271,7 @@ pub fn write_file_with_bytes_from_path(
         match super::sync::write_file_with_bytes_from_path(
             &path,
             data.buffer(),
-            mode,
-            flag,
+            options
         ) {
             Ok(_) => {
                 callback.on_success(None);
