@@ -163,10 +163,10 @@ pub fn append_file_with_str(fd: c_int, data: &str, options: AppendFileOptions, c
     });
 }
 
-pub fn append_file_with_bytes(fd: c_int, data: &Buffer, callback: Arc<AsyncClosure<(), Error>>) {
+pub fn append_file_with_bytes(fd: c_int, data: &Buffer, options: AppendFileOptions, callback: Arc<AsyncClosure<(), Error>>) {
     let data = data.clone();
     let _ = node_core::thread::spawn(move || {
-        match super::sync::append_file_with_bytes(fd, data.buffer()) {
+        match super::sync::append_file_with_bytes(fd, data.buffer(), options) {
             Ok(_) => {
                 callback.on_success(None);
             }
@@ -1271,7 +1271,7 @@ pub fn write_file_with_bytes_from_path(
         match super::sync::write_file_with_bytes_from_path(
             &path,
             data.buffer(),
-            options
+            options,
         ) {
             Ok(_) => {
                 callback.on_success(None);

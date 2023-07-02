@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 cxx = "1.0.95"
+node-core = {path = "../node-core"}
 node-buffer = { path = "../node-buffer" }
 node-fs = { path = "../node-fs" }
 

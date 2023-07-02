@@ -6,11 +6,13 @@ use std::sync::Arc;
 
 use libc::size_t;
 
+#[derive(Debug)]
 pub enum FileDirentInner {
     Raw(*mut c_void),
     Regular(fs::DirEntry),
 }
 
+#[derive(Debug)]
 pub struct FileDirent(pub(crate) Arc<FileDirentInner>);
 
 impl FileDirent {

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::io::ErrorKind;
 use anyhow::Error;
 
 /// A simple error type that lets the creator specify both the error message and
@@ -20,6 +21,13 @@ impl Display for CustomError {
     }
 }
 
+
+pub fn error_from_io_error(error: std::io::Error) -> Error {
+    let kind = error.kind();
+    generic_error(kind.to_string())
+}
+
+
 impl std::error::Error for CustomError {}
 
 /// If this error was crated with `custom_error()`, return the specified error
@@ -28,7 +36,12 @@ pub fn get_custom_error_class(error: &Error) -> Option<&'static str> {
     error.downcast_ref::<CustomError>().map(|e| e.class)
 }
 
+pub fn get_custom_error_message(error: &Error) -> Option<Cow<str>> {
+    error.downcast_ref::<CustomError>().map(|e| e.message.clone())
+}
+
 pub type AnyError = anyhow::Error;
+
 
 pub fn custom_error(
     class: &'static str,

@@ -1,9 +1,41 @@
-use std::ffi::{i64, c_uint, c_ushort, c_void, CString};
+use std::borrow::Cow;
+use std::ffi::{i64, c_uint, c_ushort, c_void, CString, c_ulonglong};
 use std::os::raw::{c_int, c_long};
 use std::sync::Arc;
 use node_fs::file_dirent::FileDirent;
 use node_fs::prelude::{FsEncodingType, handle_meta};
-use crate::ffi::ReaddirResultType;
+use crate::ffi::{ReaddirResultType};
+
+#[derive(Clone)]
+pub struct Error(node_core::error::AnyError);
+
+impl Error {
+    pub fn custom_error(clazz: &str, message: &str) -> Self {
+        Self(
+            node_core::error::custom_error(clazz, message)
+        )
+    }
+
+    pub fn generic_error(message: &str) -> Self {
+        Self(
+            node_core::error::generic_error(message)
+        )
+    }
+
+    pub fn type_error(message: &str) -> Self {
+        Self(
+            node_core::error::type_error(message)
+        )
+    }
+
+    pub fn clazz(&self) -> &'static str {
+        node_core::error::get_custom_error_class(&self.0).unwrap_or("Error")
+    }
+
+    pub fn message(&self) -> Cow<str> {
+        node_core::error::get_custom_error_message(&self.0).unwrap_or_default()
+    }
+}
 
 fn to_optional(value: isize) -> Option<usize> {
     if value < 0 {
@@ -325,28 +357,28 @@ fn fs_access_sync(path: &str, mode: i32) -> Result<(), String> {
     node_fs::sync::access(path, mode).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_sync(fd: i32, buffer: &Buffer) -> Result<(), String> {
-    node_fs::sync::append_file_with_buffer(fd, &buffer.0).map_err(|e| e.to_string())
+fn fs_append_file_sync(fd: i32, buffer: &Buffer, options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_buffer(fd, &buffer.0, options.into()).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_with_bytes_sync(fd: i32, bytes: &[u8]) -> Result<(), String> {
-    node_fs::sync::append_file_with_bytes(fd, bytes).map_err(|e| e.to_string())
+fn fs_append_file_with_bytes_sync(fd: i32, bytes: &[u8], options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_bytes(fd, bytes, options.into()).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_with_string_encoding_sync(fd: i32, string: &str, encoding: ffi::StringEncoding) -> Result<(), String> {
-    node_fs::sync::append_file_with_str_encoding(fd, string, encoding.into()).map_err(|e| e.to_string())
+fn fs_append_file_with_string_sync(fd: i32, string: &str, options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_str(fd, string, options.into()).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_with_path_sync(path: &str, buffer: &Buffer, mode: i32, flags: i32) -> Result<(), String> {
-    node_fs::sync::append_file_with_path_buffer(path, &buffer.0, mode, flags).map_err(|e| e.to_string())
+fn fs_append_file_with_path_sync(path: &str, buffer: &Buffer, options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_path_buffer(path, &buffer.0, options.into()).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], mode: i32, flags: i32) -> Result<(), String> {
-    node_fs::sync::append_file_with_path_bytes(path, bytes, mode, flags).map_err(|e| e.to_string())
+fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_path_bytes(path, bytes, options.into()).map_err(|e| e.to_string())
 }
 
-fn fs_append_file_with_path_string_encoding_sync(path: &str, string: &str, encoding: ffi::StringEncoding, mode: i32, flags: i32) -> Result<(), String> {
-    node_fs::sync::append_file_with_path_str_encoding(path, string, encoding.into(), mode, flags).map_err(|e| e.to_string())
+fn fs_append_file_with_path_string_sync(path: &str, string: &str, options: ffi::AppendFileOptions) -> Result<(), String> {
+    node_fs::sync::append_file_with_path_str(path, string, options.into()).map_err(|e| e.to_string())
 }
 
 fn fs_chmod_sync(path: &str, mode: u32) -> Result<(), String> {
@@ -427,9 +459,29 @@ fn fs_lstat_sync(path: &str) -> Result<Box<Metadata>, String> {
     node_fs::sync::lstat(path).map(|metadata| Box::new(Metadata(metadata))).map_err(|e| e.to_string())
 }
 
-fn fs_mkdir_sync(path: &str, mode: c_uint, recursive: bool) -> Result<(), String> {
-    node_fs::sync::mkdir(path, mode, recursive).map_err(|e| e.to_string())
+fn fs_mkdir_sync(path: &str, options: ffi::MkDirOptions) -> Result<(), String> {
+    node_fs::sync::mkdir(path, options.into()).map_err(|e| e.to_string())
 }
+
+fn fs_mkdtemp_sync(prefix: &str, options: ffi::MkdTempOptions) -> Result<String, String> {
+    node_fs::sync::mkdtemp(prefix, options.into())
+        .map(|path| path.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+fn fs_open_sync(path: &str, flag: c_int, mode: c_int) -> Result<i32, String> {
+    node_fs::sync::open(path, flag, mode)
+        .map_err(|e| e.to_string())
+}
+
+fn fs_opendir_sync(path: &str, options: ffi::OpenDirOptions) -> Result<Box<FileDir>, String> {
+    node_fs::sync::opendir(path, options.into())
+        .map(|dir| {
+            Box::new(FileDir(dir))
+        })
+        .map_err(|e| e.to_string())
+}
+
 
 #[cfg(not(windows))]
 fn fs_read_sync(
@@ -469,8 +521,8 @@ impl From<FsEncodingType> for ffi::FsEncodingType {
     }
 }
 
-fn fs_readdir_sync(path: &str, with_file_types: bool, encoding: ffi::FsEncodingType) -> Result<Vec<ReaddirResult>, String> {
-    node_fs::sync::readdir(path, with_file_types, encoding.into())
+fn fs_readdir_sync(path: &str, options: ffi::ReaddirOptions) -> Result<Vec<ReaddirResult>, String> {
+    node_fs::sync::readdir(path, options.into())
         .map(|mut value| {
             value.into_iter()
                 .map(|value| ReaddirResult(value))
@@ -495,20 +547,20 @@ impl FsEncoding {
     }
 }
 
-fn fs_read_file_sync(path: &str, encoding: FsEncodingType, flags: c_int) -> Result<FsEncoding, String> {
-    node_fs::sync::read_file(path, encoding.into(), flags)
+fn fs_read_file_sync(path: &str, options: ffi::ReadFileOptions) -> Result<FsEncoding, String> {
+    node_fs::sync::read_file(path, options.into())
         .map(|f| FsEncoding(f))
         .map_err(|e| e.to_string())
 }
 
-fn fs_read_file_with_fd_sync(fd: c_int, encoding: FsEncodingType, _flags: i32) -> Result<FsEncoding, String> {
-    node_fs::sync::read_file_with_fd(fd, encoding.into(), _flags)
+fn fs_read_file_with_fd_sync(fd: c_int, options: ffi::ReadFileOptions) -> Result<FsEncoding, String> {
+    node_fs::sync::read_file_with_fd(fd, options.into())
         .map(|f| FsEncoding(f))
         .map_err(|e| e.to_string())
 }
 
-fn fs_read_link_sync(path: &str, encoding: FsEncodingType) -> Result<FsEncoding, String> {
-    node_fs::sync::read_link(path, encoding.into())
+fn fs_read_link_sync(path: &str, options: ffi::ReadLinkOptions) -> Result<FsEncoding, String> {
+    node_fs::sync::read_link(path, options.into())
         .map(|f| FsEncoding(f))
         .map_err(|e| e.to_string())
 }
@@ -520,8 +572,8 @@ fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: i64) -> Result<usi
         .map_err(|e| e.to_string())
 }
 
-fn fs_real_path_sync(path: &str) -> Result<String, String> {
-    node_fs::sync::real_path(path)
+fn fs_real_path_sync(path: &str, options: ffi::RealPathOptions) -> Result<String, String> {
+    node_fs::sync::real_path(path, options.into())
         .map(|v| v.to_string_lossy().to_string())
         .map_err(|e| e.to_string())
 }
@@ -533,21 +585,17 @@ fn fs_rename_sync(old_path: &str, new_path: &str) -> Result<(), String> {
 
 fn fs_rmdir_sync(
     path: &str,
-    max_retries: c_int,
-    recursive: bool,
-    retry_delay: i64,
+    options: ffi::RmDirOptions,
 ) -> Result<(), String> {
-    node_fs::sync::rmdir(path, max_retries, recursive, retry_delay.try_into().unwrap())
+    node_fs::sync::rmdir(path, options.into())
         .map_err(|e| e.to_string())
 }
 
 fn fs_rm_sync(
     path: &str,
-    max_retries: c_int,
-    recursive: bool,
-    retry_delay: i64,
+    options: ffi::RmOptions,
 ) -> Result<(), String> {
-    node_fs::sync::rm(path, max_retries, recursive, retry_delay.try_into().unwrap())
+    node_fs::sync::rm(path, options.into())
         .map_err(|e| e.to_string())
 }
 
@@ -580,11 +628,9 @@ fn fs_utimes_sync(path: &str, atime: i64, mtime: i64) -> Result<(), String> {
 fn fs_write_sync(
     fd: c_int,
     buffer: &[u8],
-    offset: usize,
-    length: usize,
-    position: isize,
+    options: ffi::WriteOptions,
 ) -> Result<usize, String> {
-    node_fs::sync::write(fd, buffer, offset, length, position)
+    node_fs::sync::write(fd, buffer, options.into())
         .map_err(|e| e.to_string())
 }
 
@@ -599,25 +645,23 @@ fn fs_write_string_sync(
     ).map_err(|e| e.to_string())
 }
 
-fn fs_write_file_with_str_sync(fd: c_int, data: &str, encoding: ffi::StringEncoding) -> Result<(), String> {
-    node_fs::sync::write_file_with_str(fd, data, encoding.into())
+fn fs_write_file_with_str_sync(fd: c_int, data: &str, options: ffi::WriteFileOptions) -> Result<(), String> {
+    node_fs::sync::write_file_with_str(fd, data, options.into())
         .map_err(|e| e.to_string())
 }
 
-fn fs_write_file_with_bytes_sync(fd: c_int, data: &[u8]) -> Result<(), String> {
-    node_fs::sync::write_file_with_bytes(fd, data)
+fn fs_write_file_with_bytes_sync(fd: c_int, data: &[u8], options: ffi::WriteFileOptions) -> Result<(), String> {
+    node_fs::sync::write_file_with_bytes(fd, data, options.into())
         .map_err(|e| e.to_string())
 }
 
 fn fs_write_file_with_str_from_path_sync(
     path: &str,
     data: &str,
-    encoding: ffi::StringEncoding,
-    mode: c_int,
-    flag: c_int,
+    options: ffi::WriteFileOptions,
 ) -> Result<(), String> {
     node_fs::sync::write_file_with_str_from_path(
-        path, data, encoding.into(), mode, flag,
+        path, data, options.into(),
     )
         .map_err(|e| e.to_string())
 }
@@ -625,11 +669,10 @@ fn fs_write_file_with_str_from_path_sync(
 fn fs_write_file_with_bytes_from_path_sync(
     path: &str,
     data: &[u8],
-    mode: c_int,
-    flag: c_int,
+    options: ffi::WriteFileOptions,
 ) -> Result<(), String> {
     node_fs::sync::write_file_with_bytes_from_path(
-        path, data, mode, flag
+        path, data, options.into(),
     )
         .map_err(|e| e.to_string())
 }
@@ -637,17 +680,16 @@ fn fs_write_file_with_bytes_from_path_sync(
 fn fs_write_file_with_buffer_from_path_sync(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flag: c_int,
+    options: ffi::WriteFileOptions,
 ) -> Result<(), String> {
     node_fs::sync::write_file_with_buffer_from_path(
-        path, &data.0, mode, flag,
+        path, &data.0, options.into(),
     )
         .map_err(|e| e.to_string())
 }
 
 fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: i64) -> Result<usize, String> {
-    let mut buffers = buffers.iter().map(|buffer| buffer.clone()).collect::<Vec<node_buffer::Buffer>>();
+    let buffers = buffers.iter().map(|buffer| buffer.clone()).collect::<Vec<node_buffer::Buffer>>();
     node_fs::sync::writev(
         fd, buffers, position.try_into().unwrap(),
     )
@@ -655,45 +697,816 @@ fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: i64) -> Result<
 }
 
 
-#[derive(Clone, Debug)]
-pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), std::io::Error>>);
+// async
+
+pub fn access(path: &str, access: i32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::access(path, access, cb)
+}
+
+pub fn append_file_with_str(fd: i32, data: &str, options: ffi::AppendFileOptions, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::append_file_with_str(fd, data, options.into(), cb)
+}
+
+pub fn append_file_with_bytes(fd: i32, data: &Buffer, options: ffi::AppendFileOptions, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::append_file_with_bytes(fd, &data.0, options.0, cb)
+}
+
+pub fn append_file_with_path_str(
+    path: &str,
+    data: &str,
+    options: ffi::AppendFileOptions,
+    callback: AsyncClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::append_file_with_path_str(path, data, options.into(), cb)
+}
+
+pub fn append_file_with_path_bytes(
+    path: &str,
+    data: &Buffer,
+    options: ffi::AppendFileOptions,
+    callback: AsyncClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::append_file_with_path_bytes(path, &data.0, options.into(), cb)
+}
+
+pub fn chmod(path: &str, mode: u32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::chmod(path, mode, cb)
+}
+
+pub fn chown(path: &str, uid: u32, gid: u32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+
+    node_fs::a_sync::chown(path, uid, gid, cb)
+}
+
+pub fn close(fd: i32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::close(fd, cb)
+}
+
+pub fn copy_file(src: &str, dest: &str, flag: u32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::copy_file(src, dest, flag, cb)
+}
+
+pub fn cp(_src: &str, _dest: &str) {}
+
+pub fn exists(path: &str, callback: AsyncBoolClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result)
+            }
+        }))
+    );
+    node_fs::a_sync::exists(path, cb)
+}
+
+pub fn fchmod(fd: i32, mode: u16, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::fchmod(fd, mode, cb)
+}
+
+pub fn fchown(fd: i32, uid: u32, gid: u32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::fchown(fd, uid, gid, cb)
+}
+
+pub fn fdatasync(fd: i32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::fdatasync(fd, cb)
+}
+
+pub fn fstat(fd: i32, callback: AsyncFileStatClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(|stat| stat.into()))
+            }
+        }))
+    );
+    node_fs::a_sync::fstat(fd, cb);
+}
+
+pub fn fsync(fd: i32, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::fdatasync(fd, cb)
+}
+
+pub fn ftruncate(fd: i32, len: i64, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::ftruncate(fd, len, cb)
+}
+
+pub fn futimes(fd: c_int, atime: i64, mtime: i64, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::futimes(fd, atime, mtime, cb)
+}
+
+pub fn lchmod(path: &str, mode: c_ushort, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::lchmod(path, mode, cb)
+}
+
+pub fn lchown(path: &str, uid: c_uint, gid: c_uint, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::lchown(path, uid, gid, cb)
+}
+
+pub fn lutimes(path: &str, atime: i64, mtime: i64, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::lutimes(path, atime, mtime, cb)
+}
+
+pub fn link(existing_path: &str, new_path: &str, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::link(existing_path, new_path, cb)
+}
+
+pub fn lstat(path: &str, callback: AsyncFileStatClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(|stat| stat.into()))
+            }
+        }))
+    );
+
+    node_fs::a_sync::lstat(path, cb)
+}
+
+pub fn mkdir(path: &str, options: ffi::MkDirOptions, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::mkdir(path, options.into(), cb)
+}
+
+pub fn mkdtemp(prefix: &str, callback: AsyncStringClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |path, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(path.map(|path| path.to_string_lossy().to_string()))
+            }
+        }))
+    );
+    node_fs::a_sync::mkdtemp(prefix, options.into(), cb);
+}
+
+pub fn open(path: &str, flag: c_int, mode: c_int, callback: AsyncI32Closure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result)
+            }
+        }))
+    );
+    node_fs::a_sync::open(path, flag, mode, cb);
+}
+
+pub fn opendir(path: &str, options: ffi::OpenDirOptions, callback: AsyncFileDirClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(FileDir))
+            }
+        }))
+    );
+    node_fs::a_sync::opendir(path, options.into(), cb);
+}
+
+pub fn read(
+    fd: c_int,
+    buffer: &mut Buffer,
+    offset: usize,
+    length: usize,
+    position: isize,
+    callback: AsyncUsizeClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result)
+            }
+        }))
+    );
+
+    node_fs::a_sync::read(fd, &mut buffer.0, offset, length, position, cb)
+}
+
+pub fn readdir(
+    path: &str,
+    options: ffi::ReaddirOptions,
+    callback: AsyncReaddirClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success( result.map(|result|result.into_iter()
+                    .map(|value| ReaddirResult(value))
+                    .collect::<Vec<ReaddirResult>>()))
+            }
+        }))
+    );
+
+    node_fs::a_sync::readdir(path, options.into(), cb)
+}
+
+pub fn read_file(path: &str, options: ffi::ReadFileOptions, callback: AsyncFsEncodingClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(FsEncoding))
+            }
+        }))
+    );
+
+    node_fs::a_sync::read_file(path, options.into(), cb)
+}
+
+pub fn read_file_with_fd(fd: c_int, options: ffi::ReadFileOptions, callback: AsyncFsEncodingClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(FsEncoding))
+            }
+        }))
+    );
+
+    node_fs::a_sync::read_file_with_fd(fd, options.into(), cb)
+}
+
+pub fn read_link(path: &str, options: ffi::ReadLinkOptions, callback: AsyncFsEncodingClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(FsEncoding))
+            }
+        }))
+    );
+
+    node_fs::a_sync::read_link(path, options.into(), cb)
+}
+
+pub fn readv(
+    fd: c_int,
+    buffers: Vec<Buffer>,
+    position: i64,
+    callback: AsyncUsizeClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result)
+            }
+        }))
+    );
+
+    let buffers = buffers.into_iter().map(|buffer| buffer.0).collect::<Vec<node_buffer::Buffer>>();
+
+    node_fs::a_sync::readv(fd, buffers, position, cb)
+}
+
+pub fn real_path(path: &str, options: ffi::RealPathOptions, callback: AsyncStringClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if result.is_some() {
+                callback.on_success(result.map(|result| result.to_string_lossy().to_string()))
+            } else {
+                callback.on_error(error)
+            }
+        }))
+    );
+
+    node_fs::a_sync::real_path(path, options.into(), cb)
+}
+
+pub fn rename(old_path: &str, new_path: &str, callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::rename(old_path, new_path, cb)
+}
+
+pub fn rmdir(
+    path: &str,
+    options: ffi::RmDirOptions,
+    callback: AsyncClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::rmdir(path, options.into(), cb)
+}
+
+pub fn rm(
+    path: &str,
+    options: ffi::RmOptions,
+    callback: AsyncClosure,
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::rm(path, options.into(), cb)
+}
+
+pub fn stat(path: &str, throw_if_no_entry: bool, callback: AsyncFileStatClosure) {}
+
+pub fn symlink(target: &str, path: &str, type_: &str, callback: AsyncClosure) {
+    node_fs::a_sync::symlink(target, path, type_, Arc::clone(&callback.0))
+}
+
+pub fn truncate(path: &str, len: c_ulonglong, callback: AsyncClosure) {
+    node_fs::a_sync::truncate(path, len, Arc::clone(&callback.0))
+}
+
+pub fn unlink(path: &str, callback: AsyncClosure) {
+    node_fs::a_sync::unlink(path, Arc::clone(&callback.0))
+}
+
+pub fn unwatch_file(filename: &str) {
+    node_fs::a_sync::unwatch_file(filename, None)
+}
+
+pub fn unwatch_file_with_callback(filename: &str, callback: AsyncFileWatchClosure) {
+    node_fs::a_sync::unwatch_file(filename, Some())
+}
+
+pub fn utimes(path: &str, atime: i64, mtime: i64, callback: AsyncClosure) {
+    node_fs::a_sync::utimes(path, atime, mtime, Arc::clone(&callback.0))
+}
+
+pub fn file_watcher_unref(filename: &str, callback: AsyncFileWatchClosure) {}
+
+pub fn file_watcher_ref(filename: &str, callback: AsyncFileWatchClosure) {}
+
+pub fn watch(
+    filename: &str,
+    persistent: bool,
+    recursive: bool,
+    encoding: FsEncodingType,
+    callback: AsyncWatchClosure,
+) {}
+
+pub fn watcher_unref(filename: &str, callback: AsyncWatchClosure) {}
+
+pub fn watcher_ref(filename: &str, callback: AsyncWatchClosure) {}
+
+pub fn watcher_close(
+    filename: &str,
+    callback: AsyncWatchClosure,
+    on_close: AsyncClosure,
+) {}
+
+pub fn watch_file(
+    filename: &str,
+    _bigint: bool,
+    persistent: bool,
+    interval: c_ulong,
+    encoding: FsEncodingType,
+    callback: AsyncFileWatchClosure,
+) {}
+
+pub fn write(
+    fd: c_int,
+    buffer: &Buffer,
+    offset: usize,
+    length: usize,
+    position: isize,
+    callback: AsyncUsizeClosure,
+) {}
+
+pub fn write_string(
+    fd: c_int,
+    string: &str,
+    encoding: StringEncoding,
+    position: isize,
+    callback: AsyncUsizeClosure,
+) {}
+
+pub fn write_file_with_str(
+    fd: c_int,
+    data: &str,
+    encoding: StringEncoding,
+    callback: AsyncClosure,
+) {}
+
+pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: AsyncClosure);
+
+pub fn write_file_with_str_from_path(
+    path: &str,
+    data: &str,
+    encoding: StringEncoding,
+    mode: c_int,
+    flag: c_int,
+    callback: AsyncClosure,
+) {}
+
+pub fn write_file_with_bytes_from_path(
+    path: &str,
+    data: &Buffer,
+    mode: c_int,
+    flag: c_int,
+    callback: AsyncClosure,
+) {}
+
+pub fn writev(
+    fd: c_int,
+    buffers: Vec<Buffer>,
+    position: i64,
+    callback: AsyncUsizeClosure,
+) {}
+
 
 #[derive(Clone, Debug)]
-pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, std::io::Error>>);
+pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), Error>>);
 
 #[derive(Clone, Debug)]
-pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileStat, std::io::Error>>);
+pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, Error>>);
 
 #[derive(Clone, Debug)]
-pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, std::io::Error>>);
+pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileStat, Error>>);
 
 #[derive(Clone, Debug)]
-pub struct AsyncUsizeClosure(Arc<node_fs::a_sync::AsyncClosure<usize, std::io::Error>>);
+pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncUsizeClosure(Arc<node_fs::a_sync::AsyncClosure<usize, Error>>);
+
+#[derive(Clone, Debug)]
+pub struct AsyncI32Closure(Arc<node_fs::a_sync::AsyncClosure<i32, Error>>);
 
 #[derive(Copy, Clone, Debug)]
 pub struct FileWatchEvent(node_fs::a_sync::FileWatchEvent);
 
 #[derive(Clone, Debug)]
-pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileWatchEvent, std::io::Error>>);
+pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileWatchEvent, Error>>);
 
 #[derive(Clone, Debug)]
-pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, std::io::Error>>);
+pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, Error>>);
 
 
 #[derive(Copy, Clone, Debug)]
 pub struct WatchEvent(node_fs::a_sync::WatchEvent);
 
 #[derive(Clone, Debug)]
-pub struct AsyncWatchClosure(Arc<node_fs::a_sync::AsyncClosure<WatchEvent, std::io::Error>>);
+pub struct AsyncWatchClosure(Arc<node_fs::a_sync::AsyncClosure<WatchEvent, Error>>);
 
 #[derive(Clone, Debug)]
-pub struct AsyncReaddirClosure(Arc<node_fs::a_sync::AsyncClosure<ReaddirResult, std::io::Error>>);
+pub struct AsyncReaddirClosure(Arc<node_fs::a_sync::AsyncClosure<Vec<ReaddirResult>, Error>>);
 
 #[derive(Clone, Debug)]
 pub struct FileDir(node_fs::file_dir::FileDir);
 
 #[derive(Clone, Debug)]
-pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, std::io::Error>>);
+pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, Error>>);
 
 #[cxx::bridge(namespace = "org::nativescript::nodecompat")]
 pub mod ffi {
@@ -756,7 +1569,45 @@ pub mod ffi {
         pub isSymbolicLink: bool,
     }
 
+    #[derive(Debug, Clone, Copy)]
+    pub struct AppendFileOptions(pub(crate) node_fs::sync::AppendFileOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct MkDirOptions(pub(crate) node_fs::sync::MkDirOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct MkdTempOptions(pub(crate) node_fs::sync::MkdTempOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct OpenDirOptions(pub(crate) node_fs::sync::OpenDirOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct ReaddirOptions(pub(crate) node_fs::sync::ReaddirOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct ReadFileOptions(pub(crate) node_fs::sync::ReadFileOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct ReadLinkOptions(pub(crate) node_fs::sync::ReadLinkOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct RealPathOptions(pub(crate) node_fs::sync::RealPathOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct RmDirOptions(pub(crate) node_fs::sync::RmDirOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct RmOptions(pub(crate) node_fs::sync::RmOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct WriteOptions(pub(crate) node_fs::sync::WriteOptions);
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct WriteFileOptions(pub(crate) node_fs::sync::WriteFileOptions);
+
+
     extern "Rust" {
+        type Error;
         type Buffer;
 
         fn buffer_alloc(size: usize) -> Box<Buffer>;
@@ -869,17 +1720,17 @@ pub mod ffi {
 
         fn fs_access_sync(path: &str, mode: i32) -> Result<(), String>;
 
-        fn fs_append_file_sync(fd: i32, buffer: &Buffer) -> Result<(), String>;
+        fn fs_append_file_sync(fd: i32, buffer: &Buffer, options: AppendFileOptions) -> Result<(), String>;
 
-        fn fs_append_file_with_bytes_sync(fd: i32, bytes: &[u8]) -> Result<(), String>;
+        fn fs_append_file_with_bytes_sync(fd: i32, bytes: &[u8], options: AppendFileOptions) -> Result<(), String>;
 
-        fn fs_append_file_with_string_encoding_sync(fd: i32, string: &str, encoding: StringEncoding) -> Result<(), String>;
+        fn fs_append_file_with_string_sync(fd: i32, string: &str, options: AppendFileOptions) -> Result<(), String>;
 
-        fn fs_append_file_with_path_sync(path: &str, buffer: &Buffer, mode: i32, flags: i32) -> Result<(), String>;
+        fn fs_append_file_with_path_sync(path: &str, buffer: &Buffer, options: AppendFileOptions) -> Result<(), String>;
 
-        fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], mode: i32, flags: i32) -> Result<(), String>;
+        fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], options: AppendFileOptions) -> Result<(), String>;
 
-        fn fs_append_file_with_path_string_encoding_sync(path: &str, string: &str, encoding: StringEncoding, mode: i32, flags: i32) -> Result<(), String>;
+        fn fs_append_file_with_path_string_sync(path: &str, string: &str, options: AppendFileOptions) -> Result<(), String>;
 
         fn fs_chmod_sync(path: &str, mode: i32) -> Result<(), String>;
 
@@ -917,7 +1768,13 @@ pub mod ffi {
 
         fn fs_lstat_sync(path: &str) -> Result<Box<Metadata>, String>;
 
-        fn fs_mkdir_sync(path: &str, mode: c_uint, recursive: bool) -> Result<(), String>;
+        fn fs_mkdir_sync(path: &str, options: MkDirOptions) -> Result<(), String>;
+
+        fn fs_mkdtemp_sync(prefix: &str, options: MkdTempOptions) -> Result<String, String>;
+
+        fn fs_open_sync(path: &str, flag: c_int, mode: c_int) -> Result<i32, String>;
+
+        fn fs_opendir_sync(path: &str, options: OpenDirOptions) -> Result<Box<FileDir>, String>;
 
         #[cfg(not(windows))]
         fn fs_read_sync(
@@ -937,32 +1794,28 @@ pub mod ffi {
             position: isize,
         ) -> Result<usize, String>;
 
-        fn fs_readdir_sync(path: &str, with_file_types: bool, encoding: FsEncodingType) -> Result<Vec<ReaddirResult>, String>;
+        fn fs_readdir_sync(path: &str, options: ReaddirOptions) -> Result<Vec<ReaddirResult>, String>;
 
-        fn fs_read_file_sync(path: &str, encoding: FsEncodingType, flags: c_int) -> Result<FsEncoding, String>;
+        fn fs_read_file_sync(path: &str, options: ReadFileOptions) -> Result<FsEncoding, String>;
 
-        fn fs_read_file_with_fd_sync(fd: c_int, encoding: FsEncodingType, _flags: i32) -> Result<FsEncoding, String>;
+        fn fs_read_file_with_fd_sync(fd: c_int, options: ReadFileOptions) -> Result<FsEncoding, String>;
 
-        fn fs_read_link_sync(path: &str, encoding: FsEncodingType) -> Result<FsEncoding, String>;
+        fn fs_read_link_sync(path: &str, options: ReadLinkOptions) -> Result<FsEncoding, String>;
 
         fn fs_readv_sync(fd: c_int, buffers: &mut [Buffer], position: i64) -> Result<usize, String>;
 
-        fn fs_real_path_sync(path: &str) -> Result<String, String>;
+        fn fs_real_path_sync(path: &str, options: RealPathOptions) -> Result<String, String>;
 
         fn fs_rename_sync(old_path: &str, new_path: &str) -> Result<(), String>;
 
         fn fs_rmdir_sync(
             path: &str,
-            max_retries: c_int,
-            recursive: bool,
-            retry_delay: c_ulonglong,
+            options: RmDirOptions,
         ) -> Result<(), String>;
 
         fn fs_rm_sync(
             path: &str,
-            max_retries: c_int,
-            recursive: bool,
-            retry_delay: c_ulonglong,
+            options: RmOptions,
         ) -> Result<(), String>;
 
         fn fs_stat_sync(path: &str) -> Result<Box<Metadata>, String>;
@@ -978,45 +1831,38 @@ pub mod ffi {
         fn fs_write_sync(
             fd: c_int,
             buffer: &[u8],
-            offset: usize,
-            length: usize,
-            position: isize,
+            options: WriteOptions,
         ) -> Result<usize, String>;
 
         fn fs_write_string_sync(
             fd: c_int,
             string: &str,
-            encoding: StringEncoding,
-            position: isize,
+            options: WriteOptions,
         ) -> Result<usize, String>;
 
-        fn fs_write_file_with_str_sync(fd: c_int, data: &str, encoding: StringEncoding) -> Result<(), String>;
+        fn fs_write_file_with_str_sync(fd: c_int, data: &str, options: WriteFileOptions) -> Result<(), String>;
 
-        fn fs_write_file_with_bytes_sync(fd: c_int, data: &[u8]) -> Result<(), String>;
+        fn fs_write_file_with_bytes_sync(fd: c_int, data: &[u8], options: WriteFileOptions) -> Result<(), String>;
 
         fn fs_write_file_with_str_from_path_sync(
             path: &str,
             data: &str,
-            encoding: StringEncoding,
-            mode: c_int,
-            flag: c_int,
+            options: WriteFileOptions,
         ) -> Result<(), String>;
 
         fn fs_write_file_with_bytes_from_path_sync(
             path: &str,
             data: &[u8],
-            mode: c_int,
-            flag: c_int,
+            options: WriteFileOptions,
         ) -> Result<(), String>;
 
         fn fs_write_file_with_buffer_from_path_sync(
             path: &str,
             data: &Buffer,
-            mode: c_int,
-            flag: c_int,
+            options: WriteFileOptions,
         ) -> Result<(), String>;
 
-        fn fs_writev_sync(fd: c_int, mut buffers: Vec<Buffer>, position: i64) -> Result<usize, String>;
+        fn fs_writev_sync(fd: c_int, buffers: Vec<Buffer>, position: i64) -> Result<usize, String>;
     }
 
     extern "Rust" {
@@ -1046,23 +1892,21 @@ pub mod ffi {
 
         pub fn access(path: &str, access: i32, callback: AsyncClosure);
 
-        pub fn append_file_with_str(fd: i32, data: &str, callback: AsyncClosure);
+        pub fn append_file_with_str(fd: i32, data: &str, options: AppendFileOptions, callback: AsyncClosure);
 
-        pub fn append_file_with_bytes(fd: i32, data: &Buffer, callback: AsyncClosure);
+        pub fn append_file_with_bytes(fd: i32, data: &Buffer, options: AppendFileOptions, callback: AsyncClosure);
 
         pub fn append_file_with_path_str(
             path: &str,
             data: &str,
-            mode: i32,
-            flags: i32,
+            options: AppendFileOptions,
             callback: AsyncClosure,
         );
 
         pub fn append_file_with_path_bytes(
             path: &str,
             data: &Buffer,
-            mode: i32,
-            flags: i32,
+            options: AppendFileOptions,
             callback: AsyncClosure,
         );
 
@@ -1253,5 +2097,112 @@ pub mod ffi {
             position: i64,
             callback: AsyncUsizeClosure,
         );
+    }
+}
+
+
+impl Into<node_fs::sync::AppendFileOptions> for ffi::AppendFileOptions {
+    fn into(self) -> node_fs::sync::AppendFileOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::MkDirOptions> for ffi::MkDirOptions {
+    fn into(self) -> node_fs::sync::MkDirOptions {
+        self.0
+    }
+}
+
+
+impl Into<node_fs::sync::MkdTempOptions> for ffi::MkdTempOptions {
+    fn into(self) -> node_fs::sync::MkdTempOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::OpenDirOptions> for ffi::OpenDirOptions {
+    fn into(self) -> node_fs::sync::OpenDirOptions {
+        self.0
+    }
+}
+
+
+impl Into<node_fs::sync::ReaddirOptions> for ffi::ReaddirOptions {
+    fn into(self) -> node_fs::sync::ReaddirOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::ReadFileOptions> for ffi::ReadFileOptions {
+    fn into(self) -> node_fs::sync::ReadFileOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::ReadLinkOptions> for ffi::ReadLinkOptions {
+    fn into(self) -> node_fs::sync::ReadLinkOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::RealPathOptions> for ffi::RealPathOptions {
+    fn into(self) -> node_fs::sync::RealPathOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::RmDirOptions> for ffi::RmDirOptions {
+    fn into(self) -> node_fs::sync::RmDirOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::RmOptions> for ffi::RmOptions {
+    fn into(self) -> node_fs::sync::RmOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::WriteOptions> for ffi::WriteOptions {
+    fn into(self) -> node_fs::sync::WriteOptions {
+        self.0
+    }
+}
+
+impl Into<node_fs::sync::WriteFileOptions> for ffi::WriteFileOptions {
+    fn into(self) -> node_fs::sync::WriteFileOptions {
+        self.0
+    }
+}
+
+impl From<node_fs::file_stat::FileStat> for ffi::FileStat {
+    fn from(value: node_fs::file_stat::FileStat) -> Self {
+        ffi::FileStat {
+            dev: value.dev,
+            ino: value.ino,
+            mode: value.mode,
+            nlink: value.nlink,
+            uid: value.uid,
+            gid: value.gid,
+            rdev: value.rdev,
+            size: value.size,
+            blksize: value.blksize,
+            blocks: value.blocks,
+            atimeMs: value.atimeMs,
+            mtimeMs: value.mtimeMs,
+            ctimeMs: value.ctimeMs,
+            birthtimeMs: value.birthtimeMs,
+            birthtime: value.birthtime,
+            atime: value.atime,
+            mtime: value.mtime,
+            ctime: value.ctime,
+            isBlockDevice: value.isBlockDevice,
+            isCharacterDevice: value.isCharacterDevice,
+            isDirectory: value.isDirectory,
+            isFIFO: value.isFIFO,
+            isFile: value.isFile,
+            isSocket: value.isSocket,
+            isSymbolicLink: value.isSymbolicLink,
+        }
     }
 }

@@ -55,7 +55,7 @@ pub fn get_bytes(value: &str, encoding: StringEncoding) -> Vec<u8> {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum BufferInner {
     Empty,
     Allocated(Arc<RwLock<Vec<u8>>>),
@@ -168,7 +168,7 @@ impl BufferBuilder {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct Buffer(BufferInner);
 

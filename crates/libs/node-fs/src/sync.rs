@@ -127,7 +127,7 @@ pub fn access(path: &str, access: c_int) -> std::io::Result<()> {
 }
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AppendFileOptions {
     encoding: StringEncoding,
     mode: i32,
@@ -152,16 +152,16 @@ pub fn append_file_with_str(fd: c_int, data: &str, options: AppendFileOptions) -
     Ok(())
 }
 
-pub fn append_file_with_bytes(fd: c_int, data: &[u8]) -> std::io::Result<()> {
+pub fn append_file_with_bytes(fd: c_int, data: &[u8], options: AppendFileOptions) -> std::io::Result<()> {
     let mut file = unsafe { File::from_raw_fd(fd) };
     let _ = file.write(data)?;
     let _ = file.into_raw_fd();
     Ok(())
 }
 
-pub fn append_file_with_buffer(fd: c_int, data: &Buffer) -> std::io::Result<()> {
+pub fn append_file_with_buffer(fd: c_int, data: &Buffer, options: AppendFileOptions) -> std::io::Result<()> {
     let data = data.buffer();
-    append_file_with_bytes(fd, data)
+    append_file_with_bytes(fd, data, options)
 }
 
 pub fn append_file_with_path_str(
@@ -499,7 +499,7 @@ pub(crate) fn make_temp(
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct MkdTempOptions {
     encoding: StringEncoding,
 }
@@ -519,7 +519,7 @@ pub fn open(path: &str, flag: c_int, mode: c_int) -> std::io::Result<RawFd> {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct OpenDirOptions {
     encoding: StringEncoding,
     buffer_size: usize,
@@ -731,7 +731,7 @@ fn read_file_with_file(file: &mut File, options: ReadFileOptions) -> std::io::Re
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)?;
     let result = Buffer::from_vec(buf);
-    let result = match encoding {
+    let result = match options.encoding {
         FsEncodingType::Ascii => {
             FsEncoding::String(
                 CString::new(
