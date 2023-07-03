@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ffi::{i64, c_uint, c_ushort, c_void, CString, c_ulonglong};
+use std::ffi::{i64, c_uint, c_ushort, c_void, CString, c_ulonglong, c_ulong};
 use std::os::raw::{c_int, c_long};
 use std::sync::Arc;
 use node_fs::file_dirent::FileDirent;
@@ -1287,10 +1287,13 @@ pub fn real_path(path: &str, options: ffi::RealPathOptions, callback: AsyncStrin
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
-            if result.is_some() {
-                callback.on_success(result.map(|result| result.to_string_lossy().to_string()))
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
             } else {
-                callback.on_error(error)
+                callback.on_success(result.map(|result| result.to_string_lossy().to_string()))
             }
         }))
     );
@@ -1343,10 +1346,9 @@ pub fn rm(
 ) {
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
-        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
             if error.is_some() {
                 callback.on_error(error
-                    .map(node_core::error::error_from_io_error)
                     .map(Error)
                 )
             } else {
@@ -1357,18 +1359,72 @@ pub fn rm(
     node_fs::a_sync::rm(path, options.into(), cb)
 }
 
-pub fn stat(path: &str, throw_if_no_entry: bool, callback: AsyncFileStatClosure) {}
+pub fn stat(path: &str, throw_if_no_entry: bool, callback: AsyncFileStatClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(result.map(|result| result.into()))
+            }
+        }))
+    );
+    node_fs::a_sync::stat(path, throw_if_no_entry, cb)
+}
 
 pub fn symlink(target: &str, path: &str, type_: &str, callback: AsyncClosure) {
-    node_fs::a_sync::symlink(target, path, type_, Arc::clone(&callback.0))
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::symlink(target, path, type_, cb)
 }
 
 pub fn truncate(path: &str, len: c_ulonglong, callback: AsyncClosure) {
-    node_fs::a_sync::truncate(path, len, Arc::clone(&callback.0))
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::truncate(path, len, cb)
 }
 
 pub fn unlink(path: &str, callback: AsyncClosure) {
-    node_fs::a_sync::unlink(path, Arc::clone(&callback.0))
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::unlink(path, cb)
 }
 
 pub fn unwatch_file(filename: &str) {
@@ -1376,16 +1432,72 @@ pub fn unwatch_file(filename: &str) {
 }
 
 pub fn unwatch_file_with_callback(filename: &str, callback: AsyncFileWatchClosure) {
-    node_fs::a_sync::unwatch_file(filename, Some())
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(FileWatchEvent))
+            }
+        }))
+    );
+    node_fs::a_sync::unwatch_file(filename, Some(cb))
 }
 
 pub fn utimes(path: &str, atime: i64, mtime: i64, callback: AsyncClosure) {
-    node_fs::a_sync::utimes(path, atime, mtime, Arc::clone(&callback.0))
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::utimes(path, atime, mtime, cb)
 }
 
-pub fn file_watcher_unref(filename: &str, callback: AsyncFileWatchClosure) {}
+pub fn file_watcher_unref(filename: &str, callback: AsyncFileWatchClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(FileWatchEvent))
+            }
+        }))
+    );
+    node_fs::a_sync::file_watcher_unref(filename, cb);
+}
 
-pub fn file_watcher_ref(filename: &str, callback: AsyncFileWatchClosure) {}
+pub fn file_watcher_ref(filename: &str, callback: AsyncFileWatchClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(FileWatchEvent))
+            }
+        }))
+    );
+    node_fs::a_sync::file_watcher_ref(filename, cb)
+}
 
 pub fn watch(
     filename: &str,
@@ -1393,76 +1505,280 @@ pub fn watch(
     recursive: bool,
     encoding: FsEncodingType,
     callback: AsyncWatchClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(WatchEvent))
+            }
+        }))
+    );
 
-pub fn watcher_unref(filename: &str, callback: AsyncWatchClosure) {}
+    node_fs::a_sync::watch(
+        filename, persistent, recursive, encoding, cb
+    )
+}
 
-pub fn watcher_ref(filename: &str, callback: AsyncWatchClosure) {}
+pub fn watcher_unref(filename: &str, callback: AsyncWatchClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(WatchEvent))
+            }
+        }))
+    );
+
+    node_fs::a_sync::watcher_unref(filename, cb)
+}
+
+pub fn watcher_ref(filename: &str, callback: AsyncWatchClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(WatchEvent))
+            }
+        }))
+    );
+    node_fs::a_sync::watcher_ref(filename, cb)
+}
 
 pub fn watcher_close(
     filename: &str,
     callback: AsyncWatchClosure,
     on_close: AsyncClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(WatchEvent))
+            }
+        }))
+    );
+
+
+    let on_close = Arc::clone(&on_close.0);
+    let on_close_cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                on_close.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                on_close.on_success(None)
+            }
+        }))
+    );
+
+
+    node_fs::a_sync::watcher_close(filename, cb, on_close_cb)
+}
 
 pub fn watch_file(
     filename: &str,
-    _bigint: bool,
+    bigint: bool,
     persistent: bool,
     interval: c_ulong,
     encoding: FsEncodingType,
     callback: AsyncFileWatchClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(event.map(FileWatchEvent))
+            }
+        }))
+    );
+
+    node_fs::a_sync::watch_file(filename, bigint, persistent, interval, encoding, cb)
+}
 
 pub fn write(
     fd: c_int,
     buffer: &Buffer,
-    offset: usize,
-    length: usize,
-    position: isize,
+    options: ffi::WriteOptions,
     callback: AsyncUsizeClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(wrote)
+            }
+        }))
+    );
+
+    node_fs::a_sync::write(fd, &buffer.0, options.into(), cb)
+}
 
 pub fn write_string(
     fd: c_int,
     string: &str,
-    encoding: StringEncoding,
+    encoding: ffi::StringEncoding,
     position: isize,
     callback: AsyncUsizeClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(wrote)
+            }
+        }))
+    );
+    node_fs::a_sync::write_string(fd, string, encoding.into(), position, cb)
+}
 
 pub fn write_file_with_str(
     fd: c_int,
     data: &str,
-    encoding: StringEncoding,
+    encoding: ffi::StringEncoding,
     callback: AsyncClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::write_file_with_str(fd, data, encoding.into(), cb)
+}
 
-pub fn write_file_with_bytes(fd: c_int, data: &Buffer, callback: AsyncClosure);
+pub fn write_file_with_bytes(fd: c_int, data: &Buffer, options: ffi::WriteFileOptions,callback: AsyncClosure) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::write_file_with_bytes(fd, &data.0, options.into(), cb)
+}
 
 pub fn write_file_with_str_from_path(
     path: &str,
     data: &str,
-    encoding: StringEncoding,
-    mode: c_int,
-    flag: c_int,
+    options: ffi::WriteFileOptions,
     callback: AsyncClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::write_file_with_str_from_path(
+        path, data, options.into(), cb
+    )
+}
 
 pub fn write_file_with_bytes_from_path(
     path: &str,
     data: &Buffer,
-    mode: c_int,
-    flag: c_int,
+    options: ffi::WriteFileOptions,
     callback: AsyncClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+    node_fs::a_sync::write_file_with_bytes_from_path(path, &data.0, options.into(), cb)
+}
 
 pub fn writev(
     fd: c_int,
     buffers: Vec<Buffer>,
     position: i64,
     callback: AsyncUsizeClosure,
-) {}
+) {
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(Error)
+                )
+            } else {
+                callback.on_success(wrote)
+            }
+        }))
+    );
+
+    let buffers = buffers.iter().map(|buffer| buffer.0.clone())
+        .collect::<Vec<node_buffer::Buffer>>();
+
+    node_fs::a_sync::writev(fd, buffers, position, cb)
+}
 
 
 #[derive(Clone, Debug)]
@@ -1491,7 +1807,6 @@ pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileWatc
 
 #[derive(Clone, Debug)]
 pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, Error>>);
-
 
 #[derive(Copy, Clone, Debug)]
 pub struct WatchEvent(node_fs::a_sync::WatchEvent);
@@ -1889,6 +2204,10 @@ pub mod ffi {
         type FileDir;
 
         type AsyncFileDirClosure;
+
+        type FileWatchEvent;
+
+        type WatchEvent;
 
         pub fn access(path: &str, access: i32, callback: AsyncClosure);
 
