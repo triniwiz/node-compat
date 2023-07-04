@@ -57,13 +57,13 @@ unsafe impl<T, U> Sync for AsyncClosure<T, U> {}
 unsafe impl<T, U> Send for AsyncClosure<T, U> {}
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct WatchEventInner {
     pub(crate) filename: Option<String>,
     pub(crate) event_type: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct WatchEvent(WatchEventInner);
 
@@ -80,13 +80,13 @@ impl WatchEvent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct FileWatchEventInner {
     pub(crate) current: Option<FileStat>,
     pub(crate) previous: Option<FileStat>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct FileWatchEvent(FileWatchEventInner);
 
@@ -496,7 +496,7 @@ pub fn open(path: &str, flags: c_int, mode: c_int, callback: Arc<AsyncClosure<c_
     let _ = node_core::thread::spawn(move || {
         match open_path(&path, flags, mode) {
             Ok(fd) => {
-                callback.on_suopen_pathccess(Some(fd));
+                callback.on_success(Some(fd));
             }
             Err(error) => {
                 callback.on_error(Some(error));

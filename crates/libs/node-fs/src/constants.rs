@@ -20,17 +20,6 @@ pub static FILE_OPEN_OPTIONS_O_WRONLY: c_int = libc::O_WRONLY;
 #[no_mangle]
 pub static FILE_OPEN_OPTIONS_O_RDWR: c_int = libc::O_RDWR;
 
-
-#[cfg(any(target_os = "linux", target_family = "apple"))]
-#[no_mangle]
-pub static FILE_OPEN_OPTIONS_O_CREAT: c_int = libc::O_CREAT;
-
-// #[cfg(any(target_os = "macos", target_os = "ios"))]
-// #[no_mangle]
-// pub static FILE_OPEN_OPTIONS_O_CREAT: c_int = libc::O_CREAT;
-//
-
-#[cfg(any(target_os = "windows"))]
 #[no_mangle]
 pub static FILE_OPEN_OPTIONS_O_CREAT: c_int = libc::O_CREAT;
 

@@ -8,7 +8,7 @@ use node_buffer::{Buffer, StringEncoding};
 use crate::a_sync::{AsyncClosure};
 use crate::file_stat::FileStat;
 use crate::prelude::{FsEncoding, FsEncodingType};
-use crate::sync::open_handle_with_path_str;
+use crate::sync::{AppendFileOptions, open_handle_with_path, ReadFileOptions, WriteFileOptions, WriteOptions};
 
 pub struct FileHandle(File);
 
@@ -26,7 +26,7 @@ impl FileHandle {
     ) {
         let path = path.to_string();
         let _ = node_core::thread::spawn(
-            move || match open_handle_with_path_str(&path, flags, mode) {
+            move || match open_handle_with_path(&path, flags, mode) {
                 Ok(handle) => {
                     callback.on_success(Some(handle));
                 }
@@ -40,19 +40,21 @@ impl FileHandle {
     pub fn append_file_with_str(
         &mut self,
         data: &str,
+        options: AppendFileOptions,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::append_file_with_str(fd, data, callback);
+        crate::a_sync::append_file_with_str(fd, data, options, callback);
     }
 
     pub fn append_file_with_bytes(
         &mut self,
         data: &Buffer,
+        options: AppendFileOptions,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::append_file_with_bytes(fd, data, callback);
+        crate::a_sync::append_file_with_bytes(fd, data, options, callback);
     }
 
     pub fn chmod(&self, mode: c_ushort, callback: Arc<AsyncClosure<(), std::io::Error>>) {
@@ -99,13 +101,13 @@ impl FileHandle {
         let fd = self.fd();
         crate::a_sync::read(fd, buffer, offset, length, position, callback);
     }
-    pub fn readFile(
+    pub fn read_file(
         &mut self,
-        encoding: FsEncodingType,
+        options: ReadFileOptions,
         callback: Arc<AsyncClosure<FsEncoding, std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::read_file_with_fd(fd, encoding, 0, callback);
+        crate::a_sync::read_file_with_fd(fd, options, callback);
     }
 
     pub fn readv(
@@ -146,13 +148,11 @@ impl FileHandle {
     pub fn write(
         &mut self,
         buffer: &Buffer,
-        offset: usize,
-        length: usize,
-        position: isize,
+        options: WriteOptions,
         callback: Arc<AsyncClosure<usize, std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::write(fd, buffer, offset, length, position, callback);
+        crate::a_sync::write(fd, buffer, options, callback);
     }
 
     pub fn write_string(
@@ -169,20 +169,21 @@ impl FileHandle {
     pub fn write_file_with_str(
         &mut self,
         data: &str,
-        encoding: StringEncoding,
+        options: WriteFileOptions,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::write_file_with_str(fd, data, encoding, callback);
+        crate::a_sync::write_file_with_str(fd, data, options, callback);
     }
 
     pub fn write_file_with_bytes(
         &mut self,
         data: &Buffer,
+        options: WriteFileOptions,
         callback: Arc<AsyncClosure<(), std::io::Error>>,
     ) {
         let fd = self.fd();
-        crate::a_sync::write_file_with_bytes(fd, data, callback);
+        crate::a_sync::write_file_with_bytes(fd, data, options, callback);
     }
 
     pub fn writev(

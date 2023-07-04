@@ -62,6 +62,37 @@ enum BufferInner {
     Reference(Arc<RwLock<(*mut u8, usize)>>),
 }
 
+
+impl PartialEq for BufferInner {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (BufferInner::Empty, BufferInner::Empty) => true,
+            (BufferInner::Allocated(a), BufferInner::Allocated(b)) => {
+                a.read().as_slice() == b.read().as_slice()
+            }
+            (BufferInner::Reference(a), BufferInner::Reference(b)) => {
+                let a = a.read();
+                let b = b.read();
+                unsafe {
+                    std::slice::from_raw_parts(
+                        a.0,
+                        a.1,
+                    )
+                        ==
+                        std::slice::from_raw_parts(
+                            b.0,
+                            b.1,
+                        )
+                }
+            }
+
+            _ => false
+        }
+    }
+}
+
+impl Eq for BufferInner {}
+
 unsafe impl Send for BufferInner {}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -168,7 +199,7 @@ impl BufferBuilder {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[repr(C)]
 pub struct Buffer(BufferInner);
 

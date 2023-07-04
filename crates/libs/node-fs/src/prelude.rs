@@ -10,17 +10,23 @@ pub enum FsEncoding {
 
 impl FsEncoding {
     pub fn get_string_value(&self) -> Option<CString> {
-        match &self.0 {
+        match self {
             FsEncoding::String(value) => Some(value.clone()),
             _ => None,
         }
     }
 
     pub fn get_buffer_value(&self) -> Option<Buffer> {
-        match &self.0 {
+        match self {
             FsEncoding::Buffer(buffer) => { Some(buffer.clone()) }
             _ => { None }
         }
+    }
+}
+
+impl From<String> for FsEncoding {
+    fn from(value: String) -> Self {
+        Self::String(CString::new(value).unwrap())
     }
 }
 

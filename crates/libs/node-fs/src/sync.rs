@@ -104,7 +104,7 @@ pub fn open_handle_with_path(
     file_from_path(path, flag, mode).map(|v| FileHandle::new(v))
 }
 
-pub fn access(path: &str, access: c_int) -> std::io::Result<()> {
+pub fn access(path: &str, access: c_int) -> io::Result<()> {
     let path = Path::new(path);
     let mut mode = faccess::AccessMode::empty();
     if (access & FILE_ACCESS_OPTIONS_F_OK) == FILE_ACCESS_OPTIONS_F_OK {
@@ -616,21 +616,21 @@ pub enum ReaddirResult {
 
 impl ReaddirResult {
     pub fn get_string_value(&self) -> Option<CString> {
-        match &self.0 {
+        match self {
             ReaddirResult::String(value) => Some(value.clone()),
             _ => None,
         }
     }
 
     pub fn get_buffer_value(&self) -> Option<Buffer> {
-        match &self.0 {
+        match self {
             ReaddirResult::Buffer(buffer) => { Some(buffer.clone()) }
             _ => { None }
         }
     }
 
     pub fn get_type_value(&self) -> Option<FileDirent> {
-        match &self.0 {
+        match self {
             ReaddirResult::Type(dir) => { Some(dir.clone()) }
             _ => None
         }
@@ -656,9 +656,12 @@ impl Default for ReaddirOptions {
 
 pub fn readdir(path: &str, options: ReaddirOptions) -> io::Result<Vec<ReaddirResult>> {
     let read = fs::read_dir(path)?;
-    read.map(|entry| {
+    // todo
+    let mut result: Vec<ReaddirResult> = Vec::new();
+
+    for entry in read {
         let dir = entry?;
-        if options.with_file_types {
+        let ret = if options.with_file_types {
             ReaddirResult::Type(FileDirent::new_regular(dir))
         } else {
             let buffer = Buffer::from_string(
@@ -666,24 +669,24 @@ pub fn readdir(path: &str, options: ReaddirOptions) -> io::Result<Vec<ReaddirRes
             );
             match options.encoding {
                 FsEncodingType::Ascii => {
-                    CString::new(
+                    ReaddirResult::String(CString::new(
                         buffer.as_string(Some(StringEncoding::Ascii), None, None)
-                    ).unwrap()
+                    ).unwrap())
                 }
                 FsEncodingType::Utf8 => {
-                    CString::new(
+                    ReaddirResult::String(CString::new(
                         buffer.as_string(Some(StringEncoding::Utf8), None, None)
-                    ).unwrap()
+                    ).unwrap())
                 }
                 FsEncodingType::Utf16le => {
-                    CString::new(
+                    ReaddirResult::String(CString::new(
                         buffer.as_string(Some(StringEncoding::Utf16le), None, None)
-                    ).unwrap()
+                    ).unwrap())
                 }
                 FsEncodingType::Ucs2 => {
-                    CString::new(
+                    ReaddirResult::String(CString::new(
                         buffer.as_string(Some(StringEncoding::Ucs2), None, None)
-                    ).unwrap()
+                    ).unwrap())
                 }
                 FsEncodingType::Latin1 => {
                     ReaddirResult::String(
@@ -696,9 +699,11 @@ pub fn readdir(path: &str, options: ReaddirOptions) -> io::Result<Vec<ReaddirRes
                     ReaddirResult::Buffer(buffer)
                 }
             }
-        }
-    })
-        .collect::<io::Result<Vec<ReaddirResult>>>()
+        };
+        result.push(ret);
+    }
+
+    Ok(result)
 }
 
 
@@ -810,7 +815,7 @@ pub fn read_link(path: &str, options: ReadLinkOptions) -> std::io::Result<FsEnco
         result
     )?;
     let buffer = Buffer::from_string(result, StringEncoding::Utf8);
-    let result = match options.encoding {
+    let result: FsEncoding = match options.encoding {
         FsEncodingType::Ascii => {
             buffer.as_string(Some(StringEncoding::Ascii), None, None).into()
         }
@@ -930,7 +935,7 @@ pub fn rmdir(
         let mut max_retries_count = AtomicI32::new(options.max_retries);
         let op = || {
             fs::remove_dir_all(path).map(|_| ()).map_err(|e| {
-                if max_retries != 0 {
+                if options.max_retries != 0 {
                     let current = max_retries_count.load(Ordering::SeqCst);
                     if current == 0 {
                         return Error::permanent(e);
@@ -991,7 +996,7 @@ pub fn rm(
         let mut max_retries_count = AtomicI32::new(options.max_retries);
         let op = || {
             fs::remove_file(path).map_err(|e| {
-                if max_retries != 0 {
+                if options.max_retries != 0 {
                     let current = max_retries_count.load(Ordering::SeqCst);
                     if current == 0 {
                         return Error::permanent(e);
@@ -1090,12 +1095,12 @@ pub fn write(
     let result = if options.length < buffer_len {
         let tmp_buf = &buffer[options.offset..];
         let buf = &tmp_buf[..options.length];
-        if position == -1 {
+        if options.position == -1 {
             file.write(buf)
         } else {
             file.write_at(buffer, options.position as u64)
         }
-    } else if position == -1 {
+    } else if options.position == -1 {
         file.write(buffer)
     } else {
         file.write_at(buffer, options.position as u64)
@@ -1209,12 +1214,12 @@ pub fn write_file_with_str_from_path(
         opts.create_new(true);
     }
 
-    if mode != 0 {
+    if options.mode != 0 {
         opts.mode(options.mode as u32);
     }
 
     let mut file = opts.open(path)?;
-    let data = get_bytes(data, encoding);
+    let data = get_bytes(data, options.encoding);
     file.write(data.as_slice()).map(|_| ())
 }
 
@@ -1249,7 +1254,7 @@ pub fn write_file_with_bytes_from_path(
     }
 
     if options.mode != 0 {
-        opts.mode(mode as u32);
+        opts.mode(options.mode as u32);
     }
 
     let mut file = opts.open(path)?;
