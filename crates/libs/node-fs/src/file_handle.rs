@@ -7,7 +7,7 @@ use node_buffer::{Buffer, StringEncoding};
 
 use crate::a_sync::{AsyncClosure};
 use crate::file_stat::FileStat;
-use crate::prelude::{FsEncoding, FsEncodingType};
+use crate::prelude::{FsEncoding};
 use crate::sync::{AppendFileOptions, open_handle_with_path, ReadFileOptions, WriteFileOptions, WriteOptions};
 
 pub struct FileHandle(File);
