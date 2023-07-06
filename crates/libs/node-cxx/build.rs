@@ -1,6 +1,6 @@
 fn main() {
     let _ = cxx_build::bridge("src/lib.rs")
-        .include("src/include/helpers.h")
+        .file("src/helpers.hpp")
         .opt_level(3);
 
     println!("cargo:rerun-if-changed=src/lib.rs");

@@ -498,14 +498,11 @@ fn fs_fsync_sync(fd: i32) -> Result<()> {
 }
 
 fn fs_ftruncate_sync(fd: i32, len: usize) -> Result<()> {
-    let len = len as i64;
-    node_fs::sync::ftruncate(fd, len).map_err(|e| node_core::error::error_from_io_error(e))
+    node_fs::sync::ftruncate(fd, len.try_into().unwrap()).map_err(|e| node_core::error::error_from_io_error(e))
 }
 
 fn fs_futimes_sync(fd: i32, atime: usize, mtime: usize) -> Result<()> {
-    let atime = atime as i64;
-    let mtime = mtime as i64;
-    node_fs::sync::futimes(fd, atime, mtime).map_err(|e| node_core::error::error_from_io_error(e))
+    node_fs::sync::futimes(fd, atime.try_into().unwrap(), mtime.try_into().unwrap()).map_err(|e| node_core::error::error_from_io_error(e))
 }
 
 fn fs_lchmod_sync(path: &str, mode: u32) -> Result<()> {
@@ -517,7 +514,7 @@ fn fs_lchown_sync(path: &str, uid: u32, gid: u32) -> Result<()> {
 }
 
 fn fs_lutimes_sync(path: &str, atime: i64, mtime: i64) -> Result<()> {
-    node_fs::sync::lutimes(path, atime, mtime).map_err(|e| node_core::error::error_from_io_error(e))
+    node_fs::sync::lutimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap()).map_err(|e| node_core::error::error_from_io_error(e))
 }
 
 fn fs_link_sync(existing_path: &str, new_path: &str) -> Result<()> {
@@ -1069,7 +1066,7 @@ pub fn fs_async_ftruncate(fd: i32, len: i64, callback: &AsyncClosure) {
             }
         }))
     );
-    node_fs::a_sync::ftruncate(fd, len, cb)
+    node_fs::a_sync::ftruncate(fd, len.try_into().unwrap(), cb)
 }
 
 pub fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: &AsyncClosure) {
@@ -1086,7 +1083,7 @@ pub fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: &AsyncClosure
             }
         }))
     );
-    node_fs::a_sync::futimes(fd, atime, mtime, cb)
+    node_fs::a_sync::futimes(fd, atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
 }
 
 pub fn fs_async_lchmod(path: &str, mode: u16, callback: &AsyncClosure) {
@@ -1137,7 +1134,7 @@ pub fn fs_async_lutimes(path: &str, atime: i64, mtime: i64, callback: &AsyncClos
             }
         }))
     );
-    node_fs::a_sync::lutimes(path, atime, mtime, cb)
+    node_fs::a_sync::lutimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
 }
 
 pub fn fs_async_link(existing_path: &str, new_path: &str, callback: &AsyncClosure) {
@@ -1349,7 +1346,7 @@ pub fn fs_async_read_link(path: &str, options: ffi::ReadLinkOptions, callback: &
 pub fn fs_async_readv(
     fd: i32,
     buffers: Vec<Buffer>,
-    position: i64,
+    position: usize,
     callback: &AsyncUsizeClosure,
 ) {
     let callback = Arc::clone(&callback.0);
@@ -1368,7 +1365,7 @@ pub fn fs_async_readv(
 
     let buffers = buffers.into_iter().map(|buffer| buffer.0).collect::<Vec<node_buffer::Buffer>>();
 
-    node_fs::a_sync::readv(fd, buffers, position, cb)
+    node_fs::a_sync::readv(fd, buffers, position.try_into().unwrap(), cb)
 }
 
 pub fn fs_async_real_path(path: &str, options: ffi::RealPathOptions, callback: &AsyncStringClosure) {
@@ -1550,7 +1547,7 @@ pub fn fs_async_utimes(path: &str, atime: i64, mtime: i64, callback: &AsyncClosu
             }
         }))
     );
-    node_fs::a_sync::utimes(path, atime, mtime, cb)
+    node_fs::a_sync::utimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
 }
 
 pub fn fs_async_file_watcher_unref(filename: &str, callback: &AsyncFileWatchClosure) {
@@ -1708,7 +1705,7 @@ pub fn fs_async_watch_file(
         }))
     );
 
-    node_fs::a_sync::watch_file(filename, bigint, persistent, interval, encoding.into(), cb)
+    node_fs::a_sync::watch_file(filename, bigint, persistent, interval.try_into().unwrap(), encoding.into(), cb)
 }
 
 pub fn fs_async_write(
@@ -1845,7 +1842,7 @@ pub fn fs_async_write_file_with_bytes_from_path(
 pub fn fs_async_writev(
     fd: i32,
     buffers: Vec<Buffer>,
-    position: i64,
+    position: usize,
     callback: &AsyncUsizeClosure,
 ) {
     let callback = Arc::clone(&callback.0);
@@ -1865,7 +1862,7 @@ pub fn fs_async_writev(
     let buffers = buffers.iter().map(|buffer| buffer.0.clone())
         .collect::<Vec<node_buffer::Buffer>>();
 
-    node_fs::a_sync::writev(fd, buffers, position, cb)
+    node_fs::a_sync::writev(fd, buffers, position.try_into().unwrap(), cb)
 }
 
 
@@ -2092,7 +2089,7 @@ pub fn fs_handle_read_file(
 pub fn fs_handle_readv(
     handle: &mut FileHandle,
     buffers: Vec<Buffer>,
-    position: i64,
+    position: usize,
     callback: &AsyncUsizeClosure,
 ) {
     let callback = Arc::clone(&callback.0);
@@ -2113,7 +2110,7 @@ pub fn fs_handle_readv(
         .collect::<Vec<node_buffer::Buffer>>();
 
     handle.0.readv(
-        buffers, position, cb,
+        buffers, position.try_into().unwrap(), cb,
     )
 }
 
@@ -2157,7 +2154,7 @@ pub fn fs_handle_sync(handle: &mut FileHandle, callback: &AsyncClosure) {
     )
 }
 
-pub fn fs_handle_truncate(handle: &mut FileHandle, len: i64, callback: &AsyncClosure) {
+pub fn fs_handle_truncate(handle: &mut FileHandle, len: usize, callback: &AsyncClosure) {
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2173,14 +2170,14 @@ pub fn fs_handle_truncate(handle: &mut FileHandle, len: i64, callback: &AsyncClo
     );
 
     handle.0.truncate(
-        len, cb,
+        len.try_into().unwrap(), cb,
     )
 }
 
 pub fn fs_handle_utimes(
     handle: &mut FileHandle,
-    atime: i64,
-    mtime: i64,
+    atime: usize,
+    mtime: usize,
     callback: &AsyncClosure,
 ) {
     let callback = Arc::clone(&callback.0);
@@ -2198,7 +2195,7 @@ pub fn fs_handle_utimes(
     );
 
     handle.0.utimes(
-        atime, mtime, cb,
+        atime.try_into().unwrap(), mtime.try_into().unwrap(), cb,
     )
 }
 
@@ -2306,7 +2303,7 @@ pub fn fs_handle_write_file_with_bytes(
 pub fn fs_handle_writev(
     handle: &mut FileHandle,
     buffers: Vec<Buffer>,
-    position: i64,
+    position: usize,
     callback: &AsyncUsizeClosure,
 ) {
     let callback = Arc::clone(&callback.0);
@@ -2327,7 +2324,7 @@ pub fn fs_handle_writev(
         .collect::<Vec<node_buffer::Buffer>>();
 
     handle.0.writev(
-        buffers, position, cb,
+        buffers, position.try_into().unwrap(), cb,
     )
 }
 
@@ -2951,7 +2948,9 @@ pub mod ffi {
     }
 
     extern "C++" {
-        include!("node-cxx/src/include/helpers.h");
+        include!("include/helpers.hpp");
+
+        #[namespace = ""]
         type c_void;
     }
 
@@ -3353,7 +3352,7 @@ pub mod ffi {
         pub fn fs_async_readv(
             fd: i32,
             buffers: Vec<Buffer>,
-            position: i64,
+            position: usize,
             callback: &AsyncUsizeClosure,
         );
 
@@ -3459,7 +3458,7 @@ pub mod ffi {
         pub fn fs_async_writev(
             fd: i32,
             buffers: Vec<Buffer>,
-            position: i64,
+            position: usize,
             callback: &AsyncUsizeClosure,
         );
     }
@@ -3525,7 +3524,7 @@ pub mod ffi {
         pub fn fs_handle_readv(
             handle: &mut FileHandle,
             buffers: Vec<Buffer>,
-            position: i64,
+            position: usize,
             callback: &AsyncUsizeClosure,
         );
 
@@ -3533,12 +3532,12 @@ pub mod ffi {
 
         pub fn fs_handle_sync(handle: &mut FileHandle, callback: &AsyncClosure);
 
-        pub fn fs_handle_truncate(handle: &mut FileHandle, len: i64, callback: &AsyncClosure);
+        pub fn fs_handle_truncate(handle: &mut FileHandle, len: usize, callback: &AsyncClosure);
 
         pub fn fs_handle_utimes(
             handle: &mut FileHandle,
-            atime: i64,
-            mtime: i64,
+            atime: usize,
+            mtime: usize,
             callback: &AsyncClosure,
         );
 
@@ -3574,7 +3573,7 @@ pub mod ffi {
         pub fn fs_handle_writev(
             handle: &mut FileHandle,
             buffers: Vec<Buffer>,
-            position: i64,
+            position: usize,
             callback: &AsyncUsizeClosure,
         );
     }

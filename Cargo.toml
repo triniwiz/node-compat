@@ -3,7 +3,7 @@ members = [
     "crates/libs/*",
     "crates/samples/*",
     "crates/platforms/android",
-    "crates/platforms/ios/*",
+    "crates/platforms/ios",
 ]
 
 resolver = "2"
