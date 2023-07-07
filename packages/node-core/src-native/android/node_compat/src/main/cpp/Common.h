@@ -9,5 +9,7 @@
 #include <string.h>
 #include "include/v8.h"
 #include <android/log.h>
+#include "node-cxx/src/lib.rs.h"
+#include "Helpers.h"
 
 #endif //NODECOMPATDEMO_COMMON_H

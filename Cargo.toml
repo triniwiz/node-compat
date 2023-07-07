@@ -8,11 +8,11 @@ members = [
 
 resolver = "2"
 
-[dev.release]
-panic = "abort"
+#[dev.release]
+#panic = "abort"
 
 [profile.release]
-panic = "abort"
+#panic = "abort"
 codegen-units = 1
 lto = true
 opt-level = 3

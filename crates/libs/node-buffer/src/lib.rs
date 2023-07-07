@@ -43,6 +43,10 @@ pub fn get_bytes(value: &str, encoding: StringEncoding) -> Vec<u8> {
             // todo error
             base64::engine::general_purpose::STANDARD.decode(string.as_bytes()).unwrap()
         }
+        StringEncoding::Base64Url => {
+            // todo error
+            base64::engine::general_purpose::URL_SAFE.decode(string.as_bytes()).unwrap()
+        }
         StringEncoding::Binary | StringEncoding::Latin1 => {
             let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
             decoded.as_bytes().to_vec()
@@ -103,9 +107,10 @@ pub enum StringEncoding {
     Utf16le,
     Ucs2,
     Base64,
+    Base64Url,
     Latin1,
     Binary,
-    Hex,
+    Hex
 }
 
 impl TryFrom<i32> for StringEncoding {
@@ -118,9 +123,10 @@ impl TryFrom<i32> for StringEncoding {
             2 => Ok(StringEncoding::Utf16le),
             3 => Ok(StringEncoding::Ucs2),
             4 => Ok(StringEncoding::Base64),
-            5 => Ok(StringEncoding::Latin1),
-            6 => Ok(StringEncoding::Binary),
-            7 => Ok(StringEncoding::Hex),
+            5 => Ok(StringEncoding::Base64Url),
+            6 => Ok(StringEncoding::Latin1),
+            7 => Ok(StringEncoding::Binary),
+            8 => Ok(StringEncoding::Hex),
             _ => {
                 Err("Invalid StringEncoding")
             }
@@ -497,7 +503,7 @@ impl Buffer {
         let buffer = &buffer[offset.unwrap_or(0)..length];
         let mut ret = [0_u8; 8];
         let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1) };
-        let _ = BigEndian::read_i64_into(buffer, store);
+        BigEndian::read_i64_into(buffer, store);
         ret
     }
 
@@ -516,7 +522,7 @@ impl Buffer {
         let mut ret = [0_u8; 8];
         let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut i64, 1) };
 
-        let _ = LittleEndian::read_i64_into(buffer, store);
+        LittleEndian::read_i64_into(buffer, store);
 
         ret
     }
@@ -537,7 +543,7 @@ impl Buffer {
         let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1) };
 
 
-        let _ = BigEndian::read_u64_into(buffer, store);
+        BigEndian::read_u64_into(buffer, store);
 
         ret
     }
@@ -558,7 +564,7 @@ impl Buffer {
         let store = unsafe { std::slice::from_raw_parts_mut(ret.as_mut_ptr() as *mut u64, 1) };
 
 
-        let _ = LittleEndian::read_u64_into(buffer, store);
+        LittleEndian::read_u64_into(buffer, store);
 
         ret
     }
@@ -702,6 +708,10 @@ impl Buffer {
                 // todo error
                 base64::engine::general_purpose::STANDARD.decode(string.as_bytes()).unwrap()
             }
+            StringEncoding::Base64Url => {
+                // todo error
+                base64::engine::general_purpose::URL_SAFE.decode(string.as_bytes()).unwrap()
+            }
             StringEncoding::Binary | StringEncoding::Latin1 => {
                 let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
                 decoded.as_bytes().to_vec()
@@ -764,7 +774,7 @@ impl Buffer {
             }
 
             BufferInner::Empty => {
-                return &[];
+                &[]
             }
         }
     }
@@ -786,7 +796,7 @@ impl Buffer {
             }
 
             BufferInner::Empty => {
-                return &mut [];
+                &mut []
             }
         }
     }
@@ -819,10 +829,13 @@ impl Buffer {
                     }
                     StringEncoding::Utf16le | StringEncoding::Ucs2 => {
                         let buffer = unsafe { std::slice::from_raw_parts(buffer.as_ptr() as *const u16, buffer.len()) };
-                        String::from_utf16_lossy(buffer).to_string()
+                        String::from_utf16_lossy(buffer)
                     }
                     StringEncoding::Base64 => {
                         base64::engine::general_purpose::STANDARD.encode(buffer)
+                    }
+                    StringEncoding::Base64Url => {
+                        base64::engine::general_purpose::URL_SAFE.encode(buffer)
                     }
                     StringEncoding::Latin1 | StringEncoding::Binary => {
                         let encoding = encoding_rs::Encoding::for_label(b"latin1").unwrap();

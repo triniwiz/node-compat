@@ -4,11 +4,14 @@
 
 #ifndef NODECOMPATDEMO_NODECOMPATIMPL_H
 #define NODECOMPATDEMO_NODECOMPATIMPL_H
+
 #include "Common.h"
 #include "node-cxx/src/lib.rs.h"
+#include "BufferImpl.h"
+
 class NodeCompatImpl {
 public:
-    static void Init(v8::Isolate* isolate);
+    static void Init(v8::Isolate *isolate);
 };
 
 

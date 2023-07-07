@@ -5,12 +5,13 @@
   "repository": "<fill-your-repository-here>",
   "dependencies": {
     "@nativescript/core": "file:../../node_modules/@nativescript/core",
+    "@nativescript/node-buffer": "file:../../packages/node-buffer",
     "@nativescript/node-core": "file:../../packages/node-core",
     "@nativescript/node-fs": "file:../../packages/node-fs",
-    "@nativescript/node-buffer": "file:../../packages/node-buffer"
+    "buffer": "^6.0.3"
   },
   "devDependencies": {
-    "@nativescript/android": "~8.4.0",
-    "@nativescript/ios": "~8.4.0"
+    "@nativescript/android": "~8.5.0",
+    "@nativescript/ios": "~8.5.0"
   }
 }

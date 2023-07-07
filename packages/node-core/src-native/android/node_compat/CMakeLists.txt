@@ -83,8 +83,8 @@ set(CMAKE_CXX_FLAGS ${COMMON_CMAKE_ARGUMENTS})
 # Add a custom command that builds the rust crate and generates C++ bridge code
 add_custom_command(
         OUTPUT ${NODE_ANDROID_BRIDGE_CPP} ${NODE_ANDROID_LIB}
-        COMMAND cargo +nightly build -Z build-std='std,panic_abort' -Z build-std-features='panic_immediate_abort' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
-        #COMMAND cargo +nightly build -Z build-std='std' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
+        #COMMAND cargo +nightly build -Z build-std='std,panic_abort' -Z build-std-features='panic_immediate_abort' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
+        COMMAND cargo +nightly build -Z build-std='std' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
         # COMMAND cargo build --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-cxx
         DEPENDS ${NODE_ANDROID_SOURCE_FILE}
         USES_TERMINAL
@@ -98,6 +98,10 @@ add_library(
 
         src/main/cpp/rust/cxx.cc
         src/main/cpp/NodeCompatImpl.cpp
+        src/main/cpp/BufferImpl.cpp
+        src/main/cpp/Caches.cpp
+        src/main/cpp/Helpers.cpp
+        src/main/cpp/Bridge.cpp
 
         ${NODE_ANDROID_BRIDGE_CPP}
 )

@@ -90,24 +90,25 @@ impl Buffer {
 
 impl Into<node_buffer::StringEncoding> for ffi::StringEncoding {
     fn into(self) -> node_buffer::StringEncoding {
-        if self == ffi::StringEncoding::Ascii  {
+        if self == ffi::StringEncoding::Ascii {
             return node_buffer::StringEncoding::Ascii;
-        }else if self == ffi::StringEncoding::Utf8  {
+        } else if self == ffi::StringEncoding::Utf8 {
             return node_buffer::StringEncoding::Utf8;
-        } else if self == ffi::StringEncoding::Utf8  {
+        } else if self == ffi::StringEncoding::Utf8 {
             return node_buffer::StringEncoding::Utf8;
-        }
-        else if self == ffi::StringEncoding::Utf16le  {
+        } else if self == ffi::StringEncoding::Utf16le {
             return node_buffer::StringEncoding::Utf16le;
-        }else if self == ffi::StringEncoding::Ucs2  {
+        } else if self == ffi::StringEncoding::Ucs2 {
             return node_buffer::StringEncoding::Ucs2;
-        }else if self == ffi::StringEncoding::Base64  {
+        } else if self == ffi::StringEncoding::Base64 {
             return node_buffer::StringEncoding::Base64;
-        }else if self == ffi::StringEncoding::Latin1  {
+        } else if self == ffi::StringEncoding::Latin1 {
             return node_buffer::StringEncoding::Latin1;
-        }else if self == ffi::StringEncoding::Binary  {
+        } else if self == ffi::StringEncoding::Binary {
             return node_buffer::StringEncoding::Binary;
-        }else {
+        }else if self == ffi::StringEncoding::Base64Url {
+            return node_buffer::StringEncoding::Base64Url;
+        } else {
             return node_buffer::StringEncoding::Hex;
         }
 
@@ -132,6 +133,7 @@ impl From<node_buffer::StringEncoding> for ffi::StringEncoding {
             node_buffer::StringEncoding::Utf16le => ffi::StringEncoding::Utf16le,
             node_buffer::StringEncoding::Ucs2 => ffi::StringEncoding::Ucs2,
             node_buffer::StringEncoding::Base64 => ffi::StringEncoding::Base64,
+            node_buffer::StringEncoding::Base64Url => ffi::StringEncoding::Base64Url,
             node_buffer::StringEncoding::Latin1 => ffi::StringEncoding::Latin1,
             node_buffer::StringEncoding::Binary => ffi::StringEncoding::Binary,
             node_buffer::StringEncoding::Hex => ffi::StringEncoding::Hex,
@@ -180,6 +182,14 @@ fn buffer_copy_bytes_from(buffer: &Buffer) -> Box<Buffer> {
     Buffer(
         node_buffer::Buffer::from_buffer(&buffer.0)
     ).into_box()
+}
+
+fn buffer_from_reference(data: *mut u8, size: usize) -> Box<Buffer> {
+    unsafe {
+        Buffer(
+            node_buffer::Buffer::from_reference(data, size)
+        ).into_box()
+    }
 }
 
 fn buffer_atob(string: &str) -> String {
@@ -583,7 +593,7 @@ impl Into<node_fs::FsEncodingType> for ffi::FsEncodingType {
             ffi::FsEncodingType::Ucs2 => node_fs::FsEncodingType::Ucs2,
             ffi::FsEncodingType::Latin1 => node_fs::FsEncodingType::Latin1,
             ffi::FsEncodingType::Buffer => node_fs::FsEncodingType::Buffer,
-            _ => { todo!()}
+            _ => { todo!() }
         }
     }
 }
@@ -2572,12 +2582,12 @@ fn fs_async_create_async_closure(on_success: *mut ffi::c_void, on_error: *mut ff
     Box::new(
         AsyncClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn()>(on_success) };
                         (on_success)();
@@ -2592,12 +2602,12 @@ fn fs_async_create_async_bool_closure(on_success: *mut ffi::c_void, on_error: *m
     Box::new(
         AsyncBoolClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(bool)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2612,12 +2622,12 @@ fn fs_async_create_async_file_stat_closure(on_success: *mut ffi::c_void, on_erro
     Box::new(
         AsyncFileStatClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<ffi::FileStat>)>(on_success) };
                         (on_success)(Box::new(value.unwrap()));
@@ -2632,12 +2642,12 @@ fn fs_async_create_async_string_closure(on_success: *mut ffi::c_void, on_error: 
     Box::new(
         AsyncStringClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(String)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2652,12 +2662,12 @@ fn fs_async_create_async_usize_closure(on_success: *mut ffi::c_void, on_error: *
     Box::new(
         AsyncUsizeClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(usize)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2672,12 +2682,12 @@ fn fs_async_create_async_i32_closure(on_success: *mut ffi::c_void, on_error: *mu
     Box::new(
         AsyncI32Closure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(i32)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2692,12 +2702,12 @@ fn fs_async_create_async_file_watch_closure(on_success: *mut ffi::c_void, on_err
     Box::new(
         AsyncFileWatchClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileWatchEvent>)>(on_success) };
                         (on_success)(Box::new(value.unwrap()));
@@ -2712,12 +2722,12 @@ fn fs_async_create_async_fs_encoding_closure(on_success: *mut ffi::c_void, on_er
     Box::new(
         AsyncFsEncodingClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FsEncoding>)>(on_success) };
                         (on_success)(Box::new(value.unwrap()));
@@ -2732,12 +2742,12 @@ fn fs_async_create_async_fs_watch_closure(on_success: *mut ffi::c_void, on_error
     Box::new(
         AsyncWatchClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<WatchEvent>)>(on_success) };
                         (on_success)(Box::new(value.unwrap()));
@@ -2752,12 +2762,12 @@ fn fs_async_create_async_fs_readdir_closure(on_success: *mut ffi::c_void, on_err
     Box::new(
         AsyncReaddirClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Vec<ReaddirResult>)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2772,12 +2782,12 @@ fn fs_async_create_async_fs_file_dir_closure(on_success: *mut ffi::c_void, on_er
     Box::new(
         AsyncFileDirClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileDir>)>(on_success) };
                         (on_success)(Box::new(value.unwrap()));
@@ -2792,12 +2802,12 @@ fn fs_async_create_async_fs_file_handle_closure(on_success: *mut ffi::c_void, on
     Box::new(
         AsyncFileHandleClosure(
             Arc::new(
-                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error|{
+                node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
                         (on_error)(Box::new(error.unwrap()));
-                    }else {
+                    } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileHandle>)>(on_success) };
                         (on_success)(value.unwrap());
@@ -2895,6 +2905,7 @@ pub mod ffi {
         Utf16le,
         Ucs2,
         Base64,
+        Base64Url,
         Latin1,
         Binary,
         Hex,
@@ -2970,6 +2981,8 @@ pub mod ffi {
         fn buffer_from_string(string: &str, encoding: StringEncoding) -> Box<Buffer>;
 
         fn buffer_from_slice(slice: &[u8]) -> Box<Buffer>;
+
+        unsafe fn buffer_from_reference(data: *mut u8, size: usize) -> Box<Buffer>;
 
         fn buffer_copy_bytes_from(buffer: &Buffer) -> Box<Buffer>;
 
@@ -3238,7 +3251,6 @@ pub mod ffi {
 
         type AsyncI32Closure;
 
-
         pub unsafe fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncClosure>;
 
         unsafe fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncBoolClosure>;
@@ -3262,7 +3274,6 @@ pub mod ffi {
         unsafe fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileDirClosure>;
 
         unsafe fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileHandleClosure>;
-
 
         pub fn fs_async_access(path: &str, access: i32, callback: &AsyncClosure);
 
