@@ -102,6 +102,7 @@ add_library(
         src/main/cpp/Caches.cpp
         src/main/cpp/Helpers.cpp
         src/main/cpp/Bridge.cpp
+        src/main/cpp/FSImpl.cpp
 
         ${NODE_ANDROID_BRIDGE_CPP}
 )

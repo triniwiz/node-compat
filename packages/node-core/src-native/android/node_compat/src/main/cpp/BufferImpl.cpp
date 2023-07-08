@@ -46,6 +46,12 @@ v8::Local<v8::FunctionTemplate> BufferImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "alloc"),
             v8::FunctionTemplate::New(isolate, &Alloc));
 
+    // use alloc
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "allocUnsafe"),
+            v8::FunctionTemplate::New(isolate, &Alloc));
+
+
     tmpl->SetAccessor(
             Helpers::ConvertToV8String(isolate, "length"),
             &Length
@@ -67,6 +73,11 @@ v8::Local<v8::FunctionTemplate> BufferImpl::GetCtor(v8::Isolate *isolate) {
     );
 
     ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "copyBytesFrom"),
+            v8::FunctionTemplate::New(isolate, &CopyBytesFrom)
+    );
+
+    ctorTmpl->Set(
             Helpers::ConvertToV8String(isolate, "from"),
             v8::FunctionTemplate::New(isolate, &From)
     );
@@ -80,13 +91,176 @@ v8::Local<v8::FunctionTemplate> BufferImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "fill"),
             v8::FunctionTemplate::New(isolate, &Fill));
 
+
+    // write
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeInt8"),
+            v8::FunctionTemplate::New(isolate, &WriteInt8));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeUInt8"),
+            v8::FunctionTemplate::New(isolate, &WriteUInt8));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeInt16LE"),
+            v8::FunctionTemplate::New(isolate, &WriteInt16LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeInt16BE"),
+            v8::FunctionTemplate::New(isolate, &WriteInt16BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeUInt16LE"),
+            v8::FunctionTemplate::New(isolate, &WriteUInt16LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeUInt16BE"),
+            v8::FunctionTemplate::New(isolate, &WriteUInt16BE));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeInt32LE"),
+            v8::FunctionTemplate::New(isolate, &WriteInt32LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeInt32BE"),
+            v8::FunctionTemplate::New(isolate, &WriteInt32BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeUInt32LE"),
+            v8::FunctionTemplate::New(isolate, &WriteUInt32LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeUInt32BE"),
+            v8::FunctionTemplate::New(isolate, &WriteUInt32BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeFloatLE"),
+            v8::FunctionTemplate::New(isolate, &WriteFloatLE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeFloatBE"),
+            v8::FunctionTemplate::New(isolate, &WriteFloatBE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeDoubleLE"),
+            v8::FunctionTemplate::New(isolate, &WriteDoubleLE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeDoubleBE"),
+            v8::FunctionTemplate::New(isolate, &WriteDoubleBE));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeBigInt64LE"),
+            v8::FunctionTemplate::New(isolate, &WriteBigInt64LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeBigInt64BE"),
+            v8::FunctionTemplate::New(isolate, &WriteBigInt64BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeBigUInt64LE"),
+            v8::FunctionTemplate::New(isolate, &WriteBigUInt64LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeBigUInt64BE"),
+            v8::FunctionTemplate::New(isolate, &WriteBigUInt64BE));
+
+
+    // read
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readInt8"),
+            v8::FunctionTemplate::New(isolate, &ReadInt8));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readUInt8"),
+            v8::FunctionTemplate::New(isolate, &ReadUInt8));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readInt16LE"),
+            v8::FunctionTemplate::New(isolate, &ReadInt16LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readInt16BE"),
+            v8::FunctionTemplate::New(isolate, &ReadInt16BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readUInt16LE"),
+            v8::FunctionTemplate::New(isolate, &ReadUInt16LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readUInt16BE"),
+            v8::FunctionTemplate::New(isolate, &ReadUInt16BE));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readInt32LE"),
+            v8::FunctionTemplate::New(isolate, &ReadInt32LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readInt32BE"),
+            v8::FunctionTemplate::New(isolate, &ReadInt32BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readUInt32LE"),
+            v8::FunctionTemplate::New(isolate, &ReadUInt32LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readUInt32BE"),
+            v8::FunctionTemplate::New(isolate, &ReadUInt32BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readFloatLE"),
+            v8::FunctionTemplate::New(isolate, &ReadFloatLE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readFloatBE"),
+            v8::FunctionTemplate::New(isolate, &ReadFloatBE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readDoubleLE"),
+            v8::FunctionTemplate::New(isolate, &ReadDoubleLE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readDoubleBE"),
+            v8::FunctionTemplate::New(isolate, &ReadDoubleBE));
+
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readBigInt64LE"),
+            v8::FunctionTemplate::New(isolate, &ReadBigInt64LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readBigInt64BE"),
+            v8::FunctionTemplate::New(isolate, &ReadBigInt64BE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readBigUInt64LE"),
+            v8::FunctionTemplate::New(isolate, &ReadBigUInt64LE));
+
+    tmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readBigUInt64BE"),
+            v8::FunctionTemplate::New(isolate, &ReadBigUInt64BE));
+
+
+    tmpl->SetIndexedPropertyHandler(
+            &IndexedGetter,
+            &IndexedSetter
+    );
+
     cache->BufferTmpl =
             std::make_unique<v8::Persistent<v8::FunctionTemplate>>(isolate, ctorTmpl);
+
     return ctorTmpl;
 
 }
 
 BufferImpl::BufferImpl(rust::Box<Buffer> buffer) : buffer_(std::move(buffer)) {}
+
 
 void BufferImpl::Alloc(const v8::FunctionCallbackInfo<v8::Value> &args) {
     int count = args.Length();
@@ -212,7 +386,15 @@ void BufferImpl::Concat(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 auto data = static_cast<const uint8_t *>(store->Data()) + offset;
                 rust::Slice<const uint8_t> slice = rust::Slice(data, length);
                 vec.push_back(slice);
+            } else if (item->IsObject()) {
+                auto ptr = GetPointer(item->ToObject(ctx).ToLocalChecked());
+                if (ptr != nullptr) {
+                    auto buffer = buffer_buffer(*ptr->buffer_);
+                    rust::Slice<const uint8_t> slice(buffer.data(), buffer.size());
+                    vec.push_back(slice);
+                }
             }
+
         }
         if (hasError) {
             auto buffer = buffer_alloc(0);
@@ -259,6 +441,32 @@ void BufferImpl::Concat(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 }
 
+void BufferImpl::CopyBytesFrom(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto value = args[0];
+    if (value->IsTypedArray()) {
+        auto array = value.As<v8::TypedArray>();
+        auto buffer = array->Buffer();
+        auto store = buffer->GetBackingStore();
+        auto offset = array->ByteOffset();
+        auto data = static_cast<const uint8_t *>(store->Data()) + offset;
+        auto length = array->ByteLength();
+        auto buf = buffer_from_slice(rust::Slice(data, length));
+
+        auto bufferImpl = new BufferImpl(std::move(buf));
+        auto ext = v8::External::New(isolate, bufferImpl);
+
+        auto ctor = GetCtor(isolate);
+        auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+        ret->SetInternalField(0, ext);
+        args.GetReturnValue().Set(ret);
+        return;
+    }
+
+    args.GetReturnValue().SetUndefined();
+}
+
 void BufferImpl::From(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
@@ -292,6 +500,35 @@ void BufferImpl::From(const v8::FunctionCallbackInfo<v8::Value> &args) {
         ret->SetInternalField(0, ext);
         args.GetReturnValue().Set(ret);
         return;
+    } else if (value->IsArray()) {
+        auto array = value.As<v8::Array>();
+        auto len = array->Length();
+        std::vector<uint8_t> vector;
+        vector.reserve(len);
+        bool hasError = false;
+        for (int i = 0; i < len; i++) {
+            v8::Local<v8::Value> itemValue;
+            hasError = !array->Get(ctx, i).ToLocal(&itemValue);
+            if (itemValue->IsNumber()) {
+                vector.push_back((uint8_t) itemValue->NumberValue(ctx).ToChecked());
+            }
+        }
+        if (hasError) {
+            args.GetReturnValue().SetUndefined();
+            return;
+        }
+        rust::Slice<const uint8_t> slice(vector.data(), vector.size());
+
+        auto buffer = buffer_from_slice(slice);
+
+        auto bufferImpl = new BufferImpl(std::move(buffer));
+        auto ext = v8::External::New(isolate, bufferImpl);
+
+        auto ctor = GetCtor(isolate);
+        auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+        ret->SetInternalField(0, ext);
+        args.GetReturnValue().Set(ret);
+        return;
     }
 
 }
@@ -310,7 +547,7 @@ void BufferImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
         auto startValue = args[1];
         auto endValue = args[2];
 
-        if(len == 0){
+        if (len == 0) {
             auto ret = buffer_to_print_string(*ptr->buffer_);
             args.GetReturnValue().Set(
                     Helpers::ConvertToV8String(isolate, ret.c_str())
@@ -371,3 +608,709 @@ void BufferImpl::Fill(const v8::FunctionCallbackInfo<v8::Value> &args) {
         return;
     }
 }
+
+void BufferImpl::WriteInt8(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_int8(*ptr->buffer_, (int8_t) value->NumberValue(ctx).ToChecked(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteUInt8(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_uint8(*ptr->buffer_, (int8_t) value->NumberValue(ctx).ToChecked(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteInt16LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_int16le(*ptr->buffer_, (int16_t) value->NumberValue(ctx).ToChecked(),
+                                 offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteInt16BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_int16be(*ptr->buffer_, (int16_t) value->NumberValue(ctx).ToChecked(),
+                                 offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteUInt16LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_uint16le(*ptr->buffer_, (uint16_t) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteUInt16BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_uint16be(*ptr->buffer_, (int16_t) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteInt32LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_int32le(*ptr->buffer_, (int32_t) value->NumberValue(ctx).ToChecked(),
+                                 offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteInt32BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_int32be(*ptr->buffer_, (int32_t) value->NumberValue(ctx).ToChecked(),
+                                 offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteUInt32LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_uint32le(*ptr->buffer_, (uint32_t) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteUInt32BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_uint32be(*ptr->buffer_, (int32_t) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteFloatLE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_float_le(*ptr->buffer_, (float) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteFloatBE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_float_be(*ptr->buffer_, (float) value->NumberValue(ctx).ToChecked(),
+                                  offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteDoubleLE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_double_le(*ptr->buffer_, value->NumberValue(ctx).ToChecked(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteDoubleBE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsNumber()) {
+            buffer_write_double_be(*ptr->buffer_, value->NumberValue(ctx).ToChecked(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteBigInt64LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsBigInt()) {
+            buffer_write_big_int64le(*ptr->buffer_,
+                                     value->ToBigInt(ctx).ToLocalChecked()->Int64Value(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteBigInt64BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsBigInt()) {
+            buffer_write_big_int64be(*ptr->buffer_,
+                                     value->ToBigInt(ctx).ToLocalChecked()->Int64Value(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteBigUInt64LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsBigInt()) {
+            buffer_write_big_uint64le(*ptr->buffer_,
+                                      value->ToBigInt(ctx).ToLocalChecked()->Uint64Value(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::WriteBigUInt64BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto value = args[0];
+        auto offsetValue = args[1];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+        if (value->IsBigInt()) {
+            buffer_write_big_uint64be(*ptr->buffer_,
+                                      value->ToBigInt(ctx).ToLocalChecked()->Uint64Value(), offset);
+        }
+    }
+    args.GetReturnValue().SetUndefined();
+}
+
+
+void BufferImpl::ReadInt8(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_int8(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadUInt8(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_uint8(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadInt16LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_int16le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadInt16BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_int16be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadUInt16LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_uint16le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadUInt16BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_uint16be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadInt32LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_int32le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadInt32BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_int32be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadUInt32LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_uint32le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadUInt32BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_uint32be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((int32_t) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadFloatLE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_float_le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((double) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadFloatBE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_float_be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set((double) value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadDoubleLE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_double_le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadDoubleBE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_double_be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(value);
+        return;
+    }
+    args.GetReturnValue().Set(0);
+}
+
+void BufferImpl::ReadBigInt64LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_big_int64le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(v8::BigInt::New(isolate, value));
+        return;
+    }
+    args.GetReturnValue().Set(v8::BigInt::New(isolate, 0));
+}
+
+void BufferImpl::ReadBigInt64BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_big_int64be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(v8::BigInt::New(isolate, value));
+        return;
+    }
+    args.GetReturnValue().Set(v8::BigInt::New(isolate, 0));
+}
+
+void BufferImpl::ReadBigUInt64LE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_big_uint64le(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(v8::BigInt::NewFromUnsigned(isolate, value));
+        return;
+    }
+    args.GetReturnValue().Set(v8::BigInt::New(isolate, 0));
+}
+
+void BufferImpl::ReadBigUInt64BE(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(args.This());
+    if (ptr != nullptr) {
+        auto offsetValue = args[0];
+        rust::isize offset = 0;
+        if (offsetValue->IsNumber()) {
+            offset = (rust::isize) offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        auto value = buffer_read_big_uint64be(*ptr->buffer_, offset);
+        args.GetReturnValue().Set(v8::BigInt::NewFromUnsigned(isolate, value));
+        return;
+    }
+    args.GetReturnValue().Set(v8::BigInt::New(isolate, 0));
+}
+
+void BufferImpl::IndexedGetter(uint32_t index, const v8::PropertyCallbackInfo<v8::Value> &info) {
+    auto ptr = GetPointer(info.Holder());
+    if (ptr != nullptr) {
+        auto buffer = buffer_buffer(*ptr->buffer_);
+        auto size = buffer.size();
+        if (buffer.empty()) {
+            info.GetReturnValue().SetUndefined();
+            return;
+        }
+        if ((size_t) index < size) {
+            auto value = buffer[(size_t) index];
+            info.GetReturnValue().Set((uint32_t) value);
+            return;
+        }
+    }
+    info.GetReturnValue().SetUndefined();
+}
+
+void BufferImpl::IndexedSetter(uint32_t index, v8::Local<v8::Value> value,
+                               const v8::PropertyCallbackInfo<v8::Value> &info) {
+    auto isolate = info.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto ptr = GetPointer(info.Holder());
+    if (ptr != nullptr) {
+        auto buffer = buffer_buffer(*ptr->buffer_);
+
+        if (buffer.empty()) {
+            info.GetReturnValue().SetUndefined();
+            return;
+        }
+
+        if (((size_t) index) < buffer.size() && value->IsNumber()) {
+            auto val = (uint8_t) value->NumberValue(ctx).ToChecked();
+            buffer[(size_t) index] = val;
+            info.GetReturnValue().SetUndefined();
+            return;
+        }
+    }
+    info.GetReturnValue().SetUndefined();
+}
+
+

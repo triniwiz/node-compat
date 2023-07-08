@@ -3,8 +3,9 @@
 //
 
 #include "BufferImpl.h"
+#include "FSImpl.h"
 
-extern "C" void NSMain(const v8::FunctionCallbackInfo<v8::Value>& args){
+extern "C" void NSMain(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
@@ -20,4 +21,5 @@ extern "C" void NSMain(const v8::FunctionCallbackInfo<v8::Value>& args){
     }
 
     BufferImpl::Init(isolate);
+    FSImpl::Init(isolate);
 }
