@@ -15,6 +15,9 @@ public:
 
     static org::nativescript::nodecompat::StringEncoding ParseEncoding(v8::Isolate *isolate, const v8::Local<v8::Value> &value, org::nativescript::nodecompat::StringEncoding defaultValue);
 
+    static void ParseAppendFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                       org::nativescript::nodecompat::AppendFileOptions &options);
+
     static void sendToADBLogcat(const std::string& message, android_LogPriority logPriority);
 
     static void LogToConsole(const std::string &message);

@@ -198,6 +198,27 @@ pub fn append_file_with_path_buffer(
     append_file_with_path_bytes(path, data, options)
 }
 
+
+pub fn append_file_with_buffer_buffer(
+    dest: &mut Buffer,
+    data: &Buffer,
+    options: AppendFileOptions,
+) -> std::io::Result<()> {
+    let mut dest = dest.buffer_mut();
+    let data = data.buffer();
+    dest.write(data).map(|_| ())
+}
+
+pub fn append_file_with_buffer_string(
+    dest: &mut Buffer,
+    data: &str,
+    options: AppendFileOptions,
+) -> std::io::Result<()> {
+    let mut dest = dest.buffer_mut();
+    let buffer = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
+    dest.write(buffer.buffer()).map(|_| ())
+}
+
 pub fn chmod(path: &str, mode: c_uint) -> std::io::Result<()> {
     fs::set_permissions(path, Permissions::from_mode(mode))
 }

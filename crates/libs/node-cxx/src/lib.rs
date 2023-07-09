@@ -106,7 +106,7 @@ impl Into<node_buffer::StringEncoding> for ffi::StringEncoding {
             return node_buffer::StringEncoding::Latin1;
         } else if self == ffi::StringEncoding::Binary {
             return node_buffer::StringEncoding::Binary;
-        }else if self == ffi::StringEncoding::Base64Url {
+        } else if self == ffi::StringEncoding::Base64Url {
             return node_buffer::StringEncoding::Base64Url;
         } else {
             return node_buffer::StringEncoding::Hex;
@@ -454,9 +454,32 @@ fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], options: ffi::A
     node_fs::sync::append_file_with_path_bytes(path, bytes, options.into()).map_err(|e| node_core::error::error_from_io_error(e))
 }
 
+fn fs_append_file_with_path_buffer_sync(path: &str, buffer: &Buffer, options: ffi::AppendFileOptions) -> Result<()> {
+    node_fs::sync::append_file_with_path_buffer(path, &buffer.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e))
+}
+
+
 fn fs_append_file_with_path_string_sync(path: &str, string: &str, options: ffi::AppendFileOptions) -> Result<()> {
     node_fs::sync::append_file_with_path_str(path, string, options.into()).map_err(|e| node_core::error::error_from_io_error(e))
 }
+
+fn fs_append_file_with_buffer_buffer_sync(
+    dest: &mut Buffer,
+    data: &Buffer,
+    options: ffi::AppendFileOptions,
+) -> Result<()> {
+    node_fs::sync::append_file_with_buffer_buffer(&mut dest.0, &data.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e))
+}
+
+
+pub fn fs_append_file_with_buffer_string_sync(
+    dest: &mut Buffer,
+    data: &str,
+    options: ffi::AppendFileOptions,
+) -> Result<()> {
+    node_fs::sync::append_file_with_buffer_string(&mut dest.0, data, options.into()).map_err(|e| node_core::error::error_from_io_error(e))
+}
+
 
 fn fs_chmod_sync(path: &str, mode: u32) -> Result<()> {
     node_fs::sync::chmod(path, mode).map_err(|e| node_core::error::error_from_io_error(e))
@@ -3094,7 +3117,21 @@ pub mod ffi {
 
         fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], options: AppendFileOptions) -> Result<()>;
 
+        fn fs_append_file_with_path_buffer_sync(path: &str, buffer: &Buffer, options: AppendFileOptions) -> Result<()>;
+
         fn fs_append_file_with_path_string_sync(path: &str, string: &str, options: AppendFileOptions) -> Result<()>;
+
+        fn fs_append_file_with_buffer_buffer_sync(
+            dest: &mut Buffer,
+            data: &Buffer,
+            options: AppendFileOptions,
+        ) -> Result<()>;
+
+        fn fs_append_file_with_buffer_string_sync(
+            dest: &mut Buffer,
+            data: &str,
+            options: AppendFileOptions,
+        ) -> Result<()>;
 
         fn fs_chmod_sync(path: &str, mode: u32) -> Result<()>;
 

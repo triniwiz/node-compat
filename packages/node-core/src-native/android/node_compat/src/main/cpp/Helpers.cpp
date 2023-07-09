@@ -248,3 +248,35 @@ Helpers::ParseEncoding(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
 
     return defaultValue;
 }
+
+void Helpers::ParseAppendFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                     org::nativescript::nodecompat::AppendFileOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseEncoding(isolate, encodingValue,
+                                             org::nativescript::nodecompat::StringEncoding::Utf8);
+        }
+
+        v8::Local<v8::Value> modeValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "mode")).ToLocal(&modeValue);
+
+        if (modeValue->IsNumber()) {
+            options.mode = (int32_t) modeValue->NumberValue(ctx).ToChecked();
+        }
+
+
+        v8::Local<v8::Value> flagValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "flag")).ToLocal(&flagValue);
+
+
+        if(flagValue->IsNumber()){
+            options.flag = (int32_t) flagValue->NumberValue(ctx).ToChecked();
+        }
+    }
+}

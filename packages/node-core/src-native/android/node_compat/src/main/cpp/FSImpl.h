@@ -18,6 +18,8 @@ public:
 
     static void AccessSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+    static void AppendFileSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
     static void ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };

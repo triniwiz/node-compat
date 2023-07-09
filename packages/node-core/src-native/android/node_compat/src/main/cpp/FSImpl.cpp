@@ -40,6 +40,11 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "readSync"),
             v8::FunctionTemplate::New(isolate, &ReadSync));
 
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "appendFileSync"),
+            v8::FunctionTemplate::New(isolate, &AppendFileSync));
+
+
 
     cache->FsTmpl =
             std::make_unique<v8::Persistent<v8::FunctionTemplate>>(isolate, ctorTmpl);
@@ -64,6 +69,96 @@ void FSImpl::AccessSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 }
 
+void FSImpl::AppendFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto dest = args[0];
+    auto src = args[1];
+    AppendFileOptions options{};
+    auto optionsValue = args[2];
+    Helpers::ParseAppendFileOptions(isolate, optionsValue, options);
+
+    try {
+        if (dest->IsString()) {
+            if (src->IsString()) {
+                fs_append_file_with_path_string_sync(
+                        Helpers::ConvertFromV8String(isolate, dest),
+                        Helpers::ConvertFromV8String(isolate, src),
+                        options
+                );
+            } else if (src->IsObject()) {
+
+                auto ptr = BufferImpl::GetPointer(src.As<v8::Object>());
+
+                if (ptr != nullptr) {
+                    fs_append_file_with_path_sync(
+                            Helpers::ConvertFromV8String(isolate, dest),
+                            ptr->GetBuffer(),
+                            options
+                    );
+
+                } else {
+                    // todo throw error
+                }
+            }
+        } else if (dest->IsNumber()) {
+            if (src->IsString()) {
+                fs_append_file_with_string_sync(
+                        (int32_t) dest->NumberValue(ctx).ToChecked(),
+                        Helpers::ConvertFromV8String(isolate, src),
+                        options
+                );
+            } else if (src->IsObject()) {
+
+                auto ptr = BufferImpl::GetPointer(src.As<v8::Object>());
+
+                if (ptr != nullptr) {
+                    fs_append_file_sync(
+                            (int32_t) dest->NumberValue(ctx).ToChecked(),
+                            ptr->GetBuffer(),
+                            options
+                    );
+
+                } else {
+                    // todo throw error
+                }
+            }
+        } else if (dest->IsObject()) {
+            auto destPtr = BufferImpl::GetPointer(dest.As<v8::Object>());
+
+            if (destPtr != nullptr) {
+                if (src->IsString()) {
+                    fs_append_file_with_buffer_string_sync(
+                            destPtr->GetBuffer(),
+                            Helpers::ConvertFromV8String(isolate, src),
+                            options
+                    );
+                } else if (src->IsObject()) {
+
+                    auto ptr = BufferImpl::GetPointer(src.As<v8::Object>());
+
+                    if (ptr != nullptr) {
+                        fs_append_file_with_buffer_buffer_sync(
+                                destPtr->GetBuffer(),
+                                ptr->GetBuffer(),
+                                options
+                        );
+
+                    } else {
+                        // todo throw error
+                    }
+
+                } else {
+                    // todo throw error
+                }
+            }
+        }
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
 
 void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
@@ -123,7 +218,8 @@ void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 args.GetReturnValue().Set((double) ret);
                 return;
             } catch (std::exception &error) {
-                auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+                auto err = v8::Exception::Error(
+                        Helpers::ConvertToV8String(isolate, error.what()));
                 isolate->ThrowException(err);
             }
 
