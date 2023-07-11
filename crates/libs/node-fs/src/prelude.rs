@@ -2,6 +2,52 @@ use std::ffi::CString;
 use node_buffer::Buffer;
 use crate::file_stat::FileStat;
 
+
+pub fn parse_flag(value: &str) -> i32 {
+    match value {
+        "a" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT
+        }
+        "ax" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_EXCL
+        }
+        "a+" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_RDONLY
+        }
+        "ax+" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_RDONLY | super::FILE_OPEN_OPTIONS_O_EXCL
+        }
+        "as" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_DSYNC
+        }
+        "as+" => {
+            super::FILE_OPEN_OPTIONS_O_APPEND | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_DSYNC | super::FILE_OPEN_OPTIONS_O_RDONLY
+        }
+        "r" => {
+            super::FILE_OPEN_OPTIONS_O_RDONLY
+        }
+        "r+" => {
+            super::FILE_OPEN_OPTIONS_O_RDONLY | super::FILE_OPEN_OPTIONS_O_WRONLY
+        }
+        "rs+" => {
+            super::FILE_OPEN_OPTIONS_O_RDONLY | super::FILE_OPEN_OPTIONS_O_WRONLY | super::FILE_OPEN_OPTIONS_O_DSYNC
+        }
+        "w" => {
+            super::FILE_OPEN_OPTIONS_O_WRONLY
+        }
+        "wx" => {
+            super::FILE_OPEN_OPTIONS_O_WRONLY | super::FILE_OPEN_OPTIONS_O_EXCL
+        }
+        "w+" => {
+            super::FILE_OPEN_OPTIONS_O_WRONLY | super::FILE_OPEN_OPTIONS_O_RDONLY | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_TRUNC
+        }
+        "wx+" => {
+            super::FILE_OPEN_OPTIONS_O_WRONLY | super::FILE_OPEN_OPTIONS_O_RDONLY | super::FILE_OPEN_OPTIONS_O_CREAT | super::FILE_OPEN_OPTIONS_O_TRUNC | super::FILE_OPEN_OPTIONS_O_EXCL
+        }
+        _ => 0
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum FsEncoding {
     String(CString),

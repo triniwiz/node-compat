@@ -65,7 +65,8 @@ for (let i = 0; i < str.length; i++) {
   buf[i] = str.charCodeAt(i);
 }
 console.timeEnd('buf[index]');
-console.log(buf.toString('utf8'));
+console.log('hey', buf, buf[1]);
+console.log('indexed', buf.toString('utf8'));
 // Prints: Node.js
 
 const buff = Buffer.from([0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff]);
@@ -75,11 +76,11 @@ console.log(buff.readBigUInt64BE(0));
 // Prints: 4294967295n
 
 const u16 = new Uint16Array([0, 0xffff]);
-const copy = global.NSCBuffer.copyBytesFrom(u16, 1, 1);
+const copy = Buffer.copyBytesFrom(u16, 1, 1);
 u16[1] = 0;
-console.log(copy.length); // 2
-console.log(copy[0]); // 255
-console.log(copy[1]); // 255
+console.log('copy', copy.length); // 2
+console.log('copy', copy[0]); // 255
+console.log('copy', copy[1]); // 255
 
 try {
   const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');

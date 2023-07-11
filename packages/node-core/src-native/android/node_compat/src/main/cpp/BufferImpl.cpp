@@ -6,6 +6,8 @@
 #include "Caches.h"
 #include "node-cxx/src/lib.rs.h"
 
+using namespace rust;
+
 void BufferImpl::Init(v8::Isolate *isolate) {
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
@@ -45,6 +47,12 @@ v8::Local<v8::FunctionTemplate> BufferImpl::GetCtor(v8::Isolate *isolate) {
     ctorTmpl->Set(
             Helpers::ConvertToV8String(isolate, "alloc"),
             v8::FunctionTemplate::New(isolate, &Alloc));
+
+    tmpl->SetAccessor(
+            Helpers::ConvertToV8String(isolate, "buffer"),
+            &GetBuffer
+    );
+
 
     // use alloc
     ctorTmpl->Set(
@@ -259,7 +267,19 @@ v8::Local<v8::FunctionTemplate> BufferImpl::GetCtor(v8::Isolate *isolate) {
 
 }
 
-BufferImpl::BufferImpl(rust::Box<Buffer> buffer) : buffer_(std::move(buffer)) {}
+BufferImpl::BufferImpl(rust::Box<Buffer> buffer) : buffer_(std::move(buffer)) {
+
+
+    auto slice = buffer_buffer(*buffer_);
+    auto clone = buffer_clone(*buffer_);
+    auto raw = clone.into_raw();
+    this->store_ = v8::ArrayBuffer::NewBackingStore(static_cast<void *>(slice.data()),
+                                                    slice.length(), [](void *data, size_t length,
+                                                                       void *deleter_data) {
+                auto ptr = static_cast<Buffer *>(deleter_data);
+                rust::Box<Buffer>::from_raw(ptr);
+            }, raw);
+}
 
 
 void BufferImpl::Alloc(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -313,6 +333,20 @@ void BufferImpl::Alloc(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
         }
     }
+}
+
+void
+BufferImpl::GetBuffer(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info) {
+    auto ptr = GetPointer(info.This());
+    auto isolate = info.GetIsolate();
+    if (ptr != nullptr) {
+        auto len = buffer_length(*ptr->buffer_);
+        auto buffer = v8::ArrayBuffer::New(isolate, ptr->store_);
+        auto ret = v8::Uint8Array::New(buffer, 0, len);
+        info.GetReturnValue().Set(ret);
+        return;
+    }
+    info.GetReturnValue().SetUndefined();
 }
 
 void

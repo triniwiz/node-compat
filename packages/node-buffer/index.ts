@@ -2,23 +2,18 @@ type StringEncoding = 'ascii' | 'utf8' | 'utf-8' | 'utf16le' | 'utf-16le' | 'ucs
 
 type ConcatType = number | Buffer;
 
+const K_MAX_LENGTH = 0x7fffffff;
+
+type TypedArray = Uint8ClampedArray | Uint8Array | Uint16Array | Uint32Array | Int8Array | Int16Array | Int32Array | Float32Array | Float64Array | BigInt64Array | BigUint64Array;
+
 export class Buffer {
   _native: NSCBuffer;
+  _buffer: ArrayBuffer;
+  poolSize = 8192;
+  _length = 0;
 
-  [value: number]: number;
-
-  private static indexedHandler: ProxyHandler<Buffer> = {
-    get(target, property) {
-      return target[property];
-    },
-    set(target, property, value): boolean {
-      target[property] = value;
-      return true;
-    },
-  };
-
-  constructor() {
-    return new Proxy(this, Buffer.indexedHandler);
+  get buffer() {
+    return this._buffer;
   }
 
   static atob(value: string): string {
@@ -30,32 +25,76 @@ export class Buffer {
   }
 
   static alloc(size: number): Buffer {
-    const buffer = new Buffer();
-    buffer._native = NSCBuffer.alloc(size);
-    return buffer;
+    if (size > K_MAX_LENGTH) {
+      throw new RangeError('The value "' + length + '" is invalid for option "size"');
+    }
+
+    const buffer = NSCBuffer.alloc(size);
+
+    const buf = buffer.buffer as any;
+
+    buf._length = buf.length;
+
+    Object.setPrototypeOf(buf, Buffer.prototype);
+
+    buf._native = buffer;
+
+    return buf;
   }
 
   static allocUnsafe(size: number): Buffer {
-    const buffer = new Buffer();
-    buffer._native = NSCBuffer.allocUnsafe(size);
-    return buffer;
+    if (size > K_MAX_LENGTH) {
+      throw new RangeError('The value "' + length + '" is invalid for option "size"');
+    }
+
+    const buffer = NSCBuffer.allocUnsafe(size);
+
+    const buf = buffer.buffer as any;
+
+    buf._length = buf.length;
+
+    Object.setPrototypeOf(buf, Buffer.prototype);
+
+    buf._native = buffer;
+
+    return buf;
+  }
+
+  static copyBytesFrom(view: TypedArray, offset: number = 0, length: number = -1) {
+    return NSCBuffer.copyBytesFrom(view, offset, length);
   }
 
   static from(string: string, encoding?: string): Buffer;
   static from(array: number[]): Buffer;
   static from(value: string | number[], encoding?: string): Buffer {
-    const buffer = new Buffer();
-    if (Array.isArray(value)) {
-      buffer._native = NSCBuffer.from(value);
-    } else if (typeof value === 'string') {
-      buffer._native = NSCBuffer.from(value, encoding);
+    if (value == null) {
+      throw new TypeError('The first argument must be one of type string, Buffer, ArrayBuffer, Array, ' + 'or Array-like Object. Received type ' + typeof value);
     }
-    return buffer;
+
+    let buffer: NSCBuffer = null;
+    if (Array.isArray(value)) {
+      buffer = NSCBuffer.from(value);
+    } else if (typeof value === 'string') {
+      buffer = NSCBuffer.from(value, encoding);
+    }
+
+    if (!buffer) {
+      return null;
+    }
+
+    const buf = buffer.buffer as any;
+
+    buf._length = buf.length;
+
+    Object.setPrototypeOf(buf, Buffer.prototype);
+
+    buf._native = buffer;
+
+    return buf;
   }
 
   static concat(buffers: ConcatType[], length: number = undefined): Buffer {
-    const buffer = new Buffer();
-    buffer._native = NSCBuffer.concat(
+    const buffer = NSCBuffer.concat(
       buffers.map((buffer) => {
         if (buffer instanceof Buffer) {
           return buffer._native;
@@ -64,15 +103,31 @@ export class Buffer {
       }),
       length
     );
-    return buffer;
+
+    if (!buffer) {
+      return null;
+    }
+
+    const buf = buffer.buffer as any;
+
+    buf._length = buf.length;
+
+    Object.setPrototypeOf(buf, Buffer.prototype);
+
+    buf._native = buffer;
+
+    return buf;
   }
 
   get length() {
-    return this._native.length;
+    return this._length;
   }
 
   toString(encoding: StringEncoding = undefined, start: number = 0, end: number = -1) {
-    return this._native.toString(encoding, start, end);
+    if (arguments.length === 0) {
+      return this._native.toString();
+    }
+    return this._native.toString(encoding ?? undefined, start ?? 0, end ?? -1);
   }
 
   writeInt8(value: number, offset: number) {

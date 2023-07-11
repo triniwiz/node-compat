@@ -141,6 +141,10 @@ impl From<node_buffer::StringEncoding> for ffi::StringEncoding {
     }
 }
 
+fn buffer_clone(buffer: &Buffer) -> Box<Buffer> {
+    Box::new(buffer.clone())
+}
+
 fn buffer_alloc(size: usize) -> Box<Buffer> {
     Buffer(node_buffer::Buffer::builder().size(size).build()).into_box()
 }
@@ -426,6 +430,10 @@ impl ReaddirResult {
             }
         }
     }
+}
+
+fn fs_parse_flag_sync(value: &str) -> i32 {
+    node_fs::prelude::parse_flag(value)
 }
 
 fn fs_access_sync(path: &str, mode: i32) -> Result<()> {
@@ -2995,6 +3003,8 @@ pub mod ffi {
 
         fn buffer_alloc(size: usize) -> Box<Buffer>;
 
+        fn buffer_clone(buffer: &Buffer) -> Box<Buffer>;
+
         fn buffer_alloc_with_size_string_encoding(size: usize, string: &str, encoding: StringEncoding) -> Box<Buffer>;
 
         fn buffer_concat(buffers: &[&[u8]]) -> Box<Buffer>;
@@ -3104,6 +3114,8 @@ pub mod ffi {
         type ReaddirResult;
 
         type FsEncoding;
+
+        fn fs_parse_flag_sync(value: &str) -> i32;
 
         fn fs_access_sync(path: &str, mode: i32) -> Result<()>;
 

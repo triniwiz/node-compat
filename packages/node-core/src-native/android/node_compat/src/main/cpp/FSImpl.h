@@ -22,6 +22,8 @@ public:
 
     static void ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+    static void OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 };
 
 

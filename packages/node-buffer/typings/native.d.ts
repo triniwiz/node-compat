@@ -15,7 +15,11 @@ declare class NSCBuffer {
 
   readonly length: number;
 
-  toString(encoding: string, start: number, end: number): string;
+  readonly buffer: Uint8Array;
+
+  static copyBytesFrom(view: TypedArray, offset?: number, length?: number);
+
+  toString(encoding?: string, start?: number, end?: number): string;
 
   writeInt8(value: number, offset: number);
 

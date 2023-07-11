@@ -13,6 +13,7 @@ using namespace org::nativescript::nodecompat;
 class BufferImpl {
 private:
     rust::Box<Buffer> buffer_;
+    std::shared_ptr<v8::BackingStore> store_;
 
 public:
 
@@ -34,6 +35,8 @@ public:
                               const v8::PropertyCallbackInfo<v8::Value> &info);
 
     static void Alloc(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void GetBuffer(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
     static void Length(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 

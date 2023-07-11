@@ -229,3 +229,14 @@ void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     args.GetReturnValue().SetUndefined();
 
 }
+
+void FSImpl::OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto value = args[0];
+    auto flagValue = args[1];
+    std::string flag("r");
+    auto modeValue = args[2];
+    //fs_open_sync()
+
+}
