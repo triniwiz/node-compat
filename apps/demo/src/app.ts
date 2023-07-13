@@ -1,6 +1,9 @@
 import { Application, knownFolders, path } from '@nativescript/core';
 
 require('@nativescript/node-core');
+
+import * as fs from '@nativescript/node-fs';
+
 import { Buffer } from '@nativescript/node-buffer';
 
 const b = require('buffer');
@@ -84,10 +87,13 @@ console.log('copy', copy[1]); // 255
 
 try {
   const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
-  global.NSCFS.accessSync(img);
+
+  fs.accessSync(img);
 } catch (error) {
   console.log(error);
 }
+
+console.dir();
 
 // try {
 //   const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
@@ -126,12 +132,34 @@ try {
   // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_WRITE | android.os.ParcelFileDescriptor.MODE_APPEND);
   // const fd = pfd.detachFd();
   console.time('appendFileSync');
-  const mode = android.os.ParcelFileDescriptor.parseMode('a');
-
-  console.log(mode);
-  global.NSCFS.appendFileSync(hello, ' data to append', { flag: 'a' });
+  fs.appendFileSync(hello, ' data to append', { flag: 'a' });
   console.timeEnd('appendFileSync');
   console.log('The "data to append" was appended to file!');
+} catch (err) {
+  console.log(err);
+  /* Handle the error */
+}
+
+// try {
+//   const file = new java.io.File(hello);
+//   const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+//   const fd = pfd.detachFd();
+//   console.time('fstatSync');
+//   const stat = fs.fstatSync(fd, { bigint: true });
+//   console.timeEnd('fstatSync');
+//   console.log('fstatSync ', stat);
+// } catch (err) {
+//   console.log(err);
+//   /* Handle the error */
+// }
+
+try {
+  const file = new java.io.File(hello);
+
+  console.time('statSync');
+  const stat = fs.statSync(file.getAbsolutePath(), { bigint: true });
+  console.timeEnd('statSync');
+  console.log('statSync ', stat);
 } catch (err) {
   console.log(err);
   /* Handle the error */

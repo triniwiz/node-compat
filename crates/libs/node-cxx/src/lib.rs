@@ -1,3 +1,5 @@
+extern crate alloc;
+
 use std::borrow::Cow;
 use std::ffi::{c_void, CString};
 use std::sync::Arc;
@@ -562,8 +564,12 @@ fn fs_link_sync(existing_path: &str, new_path: &str) -> Result<()> {
     node_fs::sync::link(existing_path, new_path).map_err(|e| node_core::error::error_from_io_error(e))
 }
 
-fn fs_lstat_sync(path: &str) -> Result<Box<Metadata>> {
-    node_fs::sync::lstat(path).map(|metadata| Box::new(Metadata(metadata))).map_err(|e| node_core::error::error_from_io_error(e))
+fn fs_lstat_sync(path: &str) -> Result<ffi::FileStat> {
+    node_fs::sync::lstat(path)
+        .map(|metadata| {
+        unsafe { std::mem::transmute(handle_meta(&metadata)) }
+    })
+        .map_err(|e| node_core::error::error_from_io_error(e))
 }
 
 fn fs_mkdir_sync(path: &str, options: ffi::MkDirOptions) -> Result<()> {
@@ -725,9 +731,11 @@ fn fs_rm_sync(
     node_fs::sync::rm(path, options.into())
 }
 
-fn fs_stat_sync(path: &str) -> Result<Box<Metadata>> {
+fn fs_stat_sync(path: &str) -> Result<ffi::FileStat> {
     node_fs::sync::stat(path)
-        .map(|meta| Box::new(Metadata(meta)))
+        .map(|metadata| {
+            unsafe { std::mem::transmute(handle_meta(&metadata)) }
+        })
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
 
@@ -2852,6 +2860,7 @@ fn fs_async_create_async_fs_file_handle_closure(on_success: *mut ffi::c_void, on
 
 #[cxx::bridge(namespace = "org::nativescript::nodecompat")]
 pub mod ffi {
+
     #[derive(Copy, Clone, Debug)]
     pub struct WriteFileOptions {
         encoding: StringEncoding,
@@ -3179,7 +3188,7 @@ pub mod ffi {
 
         fn fs_link_sync(existing_path: &str, new_path: &str) -> Result<()>;
 
-        fn fs_lstat_sync(path: &str) -> Result<Box<Metadata>>;
+        fn fs_lstat_sync(path: &str) -> Result<FileStat>;
 
         fn fs_mkdir_sync(path: &str, options: MkDirOptions) -> Result<()>;
 
@@ -3221,7 +3230,7 @@ pub mod ffi {
             options: RmOptions,
         ) -> Result<()>;
 
-        fn fs_stat_sync(path: &str) -> Result<Box<Metadata>>;
+        fn fs_stat_sync(path: &str) -> Result<FileStat>;
 
         fn fs_symlink_sync(target: &str, path: &str, _type_: &str) -> Result<()>;
 

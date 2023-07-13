@@ -20,9 +20,43 @@ public:
 
     static void AppendFileSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+    static void ChmodSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ChownSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void CloseSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
     static void ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     static void OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ExistsSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void FchmodSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void FchownSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void FdatasyncSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void FStatSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void CopyFileSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void CpSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void LchmodSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void LchownSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void LutimesSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void LinkSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void StatSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void MkdirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
 

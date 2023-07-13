@@ -41,9 +41,85 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             v8::FunctionTemplate::New(isolate, &ReadSync));
 
     ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "chmodSync"),
+            v8::FunctionTemplate::New(isolate, &ChmodSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "chownSync"),
+            v8::FunctionTemplate::New(isolate, &ChownSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "closeSync"),
+            v8::FunctionTemplate::New(isolate, &CloseSync));
+
+
+    ctorTmpl->Set(
             Helpers::ConvertToV8String(isolate, "appendFileSync"),
             v8::FunctionTemplate::New(isolate, &AppendFileSync));
 
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "existsSync"),
+            v8::FunctionTemplate::New(isolate, &ExistsSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "fchmodSync"),
+            v8::FunctionTemplate::New(isolate, &FchmodSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "fchownSync"),
+            v8::FunctionTemplate::New(isolate, &FchownSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "fdatasyncSync"),
+            v8::FunctionTemplate::New(isolate, &FdatasyncSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "fstatSync"),
+            v8::FunctionTemplate::New(isolate, &FStatSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "copyFileSync"),
+            v8::FunctionTemplate::New(isolate, &CopyFileSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "cpSync"),
+            v8::FunctionTemplate::New(isolate, &CpSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "lchmodSync"),
+            v8::FunctionTemplate::New(isolate, &LchmodSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "lchownSync"),
+            v8::FunctionTemplate::New(isolate, &LchownSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "lutimesSync"),
+            v8::FunctionTemplate::New(isolate, &LutimesSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "linkSync"),
+            v8::FunctionTemplate::New(isolate, &LinkSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "statSync"),
+            v8::FunctionTemplate::New(isolate, &StatSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "mkdirSync"),
+            v8::FunctionTemplate::New(isolate, &MkdirSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "mkdtempSync"),
+            v8::FunctionTemplate::New(isolate, &MkdtempSync));
 
 
     cache->FsTmpl =
@@ -159,6 +235,367 @@ void FSImpl::AppendFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         isolate->ThrowException(err);
     }
 }
+
+void FSImpl::ChmodSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    auto mode = args[0]->NumberValue(ctx).ToChecked();
+    if (!pathValue->IsString()) {
+        isolate->ThrowError("Invalid Path");
+    }
+    try {
+        auto path = Helpers::ConvertFromV8String(isolate, pathValue);
+        fs_chmod_sync(rust::Str(path.c_str()), (int32_t) mode);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::ChownSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    auto uid = args[1]->NumberValue(ctx).ToChecked();
+    auto gid = args[2]->NumberValue(ctx).ToChecked();
+
+    if (!pathValue->IsString()) {
+        isolate->ThrowError("Invalid Path");
+    }
+    try {
+        auto path = Helpers::ConvertFromV8String(isolate, pathValue);
+        fs_chown_sync(rust::Str(path.c_str()), (uint32_t) uid, (uint32_t) gid);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::CloseSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto fd = args[0]->NumberValue(ctx).ToChecked();
+
+    try {
+        fs_close_sync((int32_t) fd);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::ExistsSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+    try {
+        fs_exists_sync(path);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::FchmodSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto fd = args[0]->NumberValue(ctx).ToChecked();
+    uint32_t mode = 0;
+
+    auto modeValue = args[1];
+    if (modeValue->IsNumber()) {
+        mode = modeValue->Uint32Value(ctx).ToChecked();
+    }
+    try {
+        fs_fchmod_sync((int32_t) fd, mode);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::FchownSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+
+    auto path = Helpers::ConvertFromV8String(isolate, args[0]);
+    uint32_t uid = 0;
+    uint32_t gid = 0;
+    auto uidValue = args[1];
+    auto gidValue = args[2];
+
+    if (uidValue->IsUint32()) {
+        uid = uidValue->Uint32Value(ctx).ToChecked();
+    }
+
+    if (gidValue->IsUint32()) {
+        gid = gidValue->Uint32Value(ctx).ToChecked();
+    }
+
+    try {
+        fs_chown_sync(path, uid, gid);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::FdatasyncSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto fd = args[0]->NumberValue(ctx).ToChecked();
+
+    try {
+        fs_fdatasync_sync((int32_t) fd);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::FStatSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto fd = args[0]->NumberValue(ctx).ToChecked();
+    bool bigint = false;
+    auto optionsValue = args[1];
+    if (optionsValue->IsObject()) {
+        auto options = optionsValue.As<v8::Object>();
+        v8::Local<v8::Value> bigintValue;
+
+        options->Get(ctx, Helpers::ConvertToV8String(isolate, "bigint")).ToLocal(&bigintValue);
+
+        if (bigintValue->IsBoolean()) {
+            bigint = bigintValue->BooleanValue(isolate);
+        }
+    }
+    try {
+        auto stat = fs_fstat_sync((int32_t) fd);
+        args.GetReturnValue().Set(Helpers::FileStatToJS(isolate, bigint, stat));
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::CopyFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto srcValue = args[0];
+    auto src = Helpers::ConvertFromV8String(isolate, srcValue);
+
+    auto destValue = args[1];
+    auto dest = Helpers::ConvertFromV8String(isolate, destValue);
+
+    int32_t mode = 0;
+
+    auto modeValue = args[2];
+    if (modeValue->IsNumber()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        fs_copy_file_sync(src, dest, mode);
+        args.GetReturnValue().SetUndefined();
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::CpSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+
+    args.GetReturnValue().SetUndefined();
+}
+
+void FSImpl::LchmodSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+    uint32_t mode = 0;
+    auto modeValue = args[1];
+
+    if(modeValue->IsUint32()){
+        mode = modeValue->Uint32Value(ctx).ToChecked();
+    }
+
+    try {
+        fs_lchmod_sync(path, mode);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::LchownSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+    uint32_t uid = 0;
+    auto uidValue = args[1];
+
+    if(uidValue->IsUint32()){
+        uid = uidValue->Uint32Value(ctx).ToChecked();
+    }
+
+    uint32_t gid = 0;
+    auto gidValue = args[1];
+
+    if(gidValue->IsUint32()){
+        gid = gidValue->Uint32Value(ctx).ToChecked();
+    }
+
+    try {
+        fs_lchown_sync(path, uid, gid);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::LutimesSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+    int64_t atime = 0;
+    int64_t mtime = 0;
+
+    auto atimeValue = args[1];
+
+    if(atimeValue->IsBigInt()){
+        atime = atimeValue->ToBigInt(ctx).ToLocalChecked()->Int64Value();
+    }else if(atimeValue->IsDate()){
+        atime = (int64_t)atimeValue.As<v8::Date>()->ValueOf();
+    }else {
+        atime = (int64_t)atimeValue->NumberValue(ctx).ToChecked();
+    }
+
+    auto mtimeValue = args[1];
+
+    if(mtimeValue->IsBigInt()){
+        mtime = mtimeValue->ToBigInt(ctx).ToLocalChecked()->Int64Value();
+    }else if(mtimeValue->IsDate()){
+        mtime = (int64_t)mtimeValue.As<v8::Date>()->ValueOf();
+    }else {
+        mtime = (int64_t)mtimeValue->NumberValue(ctx).ToChecked();
+    }
+
+
+    try {
+        fs_lutimes_sync(path, atime, mtime);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::LinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto existingPathValue = args[0];
+    auto existingPath = Helpers::ConvertFromV8String(isolate, existingPathValue);
+
+    auto newPathValue = args[1];
+    auto newPath = Helpers::ConvertFromV8String(isolate, newPathValue);
+
+
+    try {
+        fs_link_sync(existingPath, newPath);
+        args.GetReturnValue().SetUndefined();
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::StatSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto path = Helpers::ConvertFromV8String(isolate, args[0]);
+    bool bigint = false;
+    auto optionsValue = args[1];
+    if (optionsValue->IsObject()) {
+        auto options = optionsValue.As<v8::Object>();
+        v8::Local<v8::Value> bigintValue;
+
+        options->Get(ctx, Helpers::ConvertToV8String(isolate, "bigint")).ToLocal(&bigintValue);
+
+        if (bigintValue->IsBoolean()) {
+            bigint = bigintValue->BooleanValue(isolate);
+        }
+    }
+    try {
+        auto stat = fs_stat_sync(path);
+        args.GetReturnValue().Set(Helpers::FileStatToJS(isolate, bigint, stat));
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::MkdirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    MkDirOptions options {};
+
+    Helpers::ParseMkDirOptions(isolate, args[1], options);
+
+    try {
+        fs_mkdir_sync(path, options);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
+void FSImpl::MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto prefixValue = args[0];
+    std::string prefix;
+    if (prefixValue->IsString()) {
+        prefix = Helpers::ConvertFromV8String(isolate, prefixValue);
+    }
+
+
+
+    MkdTempOptions options {};
+
+    Helpers::ParseMkdTempOptions(isolate, args[1], options);
+
+    try {
+        fs_mkdtemp_sync(prefix, options);
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+}
+
 
 void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();

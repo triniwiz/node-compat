@@ -275,8 +275,168 @@ void Helpers::ParseAppendFileOptions(v8::Isolate *isolate, const v8::Local<v8::V
         val->Get(ctx, Helpers::ConvertToV8String(isolate, "flag")).ToLocal(&flagValue);
 
 
-        if(flagValue->IsNumber()){
+        if (flagValue->IsNumber()) {
             options.flag = (int32_t) flagValue->NumberValue(ctx).ToChecked();
         }
     }
 }
+
+
+void Helpers::ParseMkDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                org::nativescript::nodecompat::MkDirOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> recursiveValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "recursive")).ToLocal(&recursiveValue);
+
+        if (recursiveValue->IsBoolean()) {
+            options.recursive = recursiveValue->BooleanValue(isolate);
+        }
+
+        v8::Local<v8::Value> modeValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "mode")).ToLocal(&modeValue);
+
+        if (modeValue->IsNumber()) {
+            options.mode = (int32_t) modeValue->NumberValue(ctx).ToChecked();
+        }
+    }
+}
+
+
+void Helpers::ParseMkdTempOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                  org::nativescript::nodecompat::MkdTempOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseEncoding(isolate, encodingValue,
+                                             org::nativescript::nodecompat::StringEncoding::Utf8);
+        }
+    }
+}
+
+
+v8::Local<v8::Object>
+Helpers::FileStatToJS(v8::Isolate *isolate, bool bigInt,
+                      const org::nativescript::nodecompat::FileStat &stat) {
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::EscapableHandleScope handle_scope(isolate);
+    v8::Local<v8::Object> ret = v8::Object::New(isolate);
+    auto ctx = isolate->GetCurrentContext();
+
+    if (bigInt) {
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "dev"),
+                 v8::BigInt::New(isolate, stat.dev));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ino"),
+                 v8::BigInt::New(isolate, stat.ino));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mode"),
+                 v8::Int32::New(isolate, stat.mode));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "nlink"),
+                 v8::BigInt::New(isolate, stat.nlink));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "uid"),
+                 v8::Int32::New(isolate, stat.uid));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "gid"),
+                 v8::Int32::New(isolate, stat.gid));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "rdev"),
+                 v8::BigInt::New(isolate, stat.rdev));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "size"),
+                 v8::BigInt::New(isolate, stat.size));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "blksize"),
+                 v8::BigInt::New(isolate, stat.blksize));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "blocks"),
+                 v8::BigInt::New(isolate, stat.blocks));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "atimeMs"),
+                 v8::Number::New(isolate, stat.atimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mtimeMs"),
+                 v8::Number::New(isolate, stat.mtimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ctimeMs"),
+                 v8::Number::New(isolate, stat.ctimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "birthtimeMs"),
+                 v8::Number::New(isolate, stat.birthtimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "birthtime"),
+                 v8::Number::New(isolate, stat.birthtime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "atime"),
+                 v8::Number::New(isolate, stat.atime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mtime"),
+                 v8::Number::New(isolate, stat.mtime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ctime"),
+                 v8::Number::New(isolate, stat.ctime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isBlockDevice"),
+                 v8::Boolean::New(isolate, stat.isBlockDevice));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isCharacterDevice"),
+                 v8::Boolean::New(isolate, stat.isCharacterDevice));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isDirectory"),
+                 v8::Boolean::New(isolate, stat.isDirectory));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isFIFO"),
+                 v8::Boolean::New(isolate, stat.isFIFO));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isFile"),
+                 v8::Boolean::New(isolate, stat.isFile));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isSocket"),
+                 v8::Boolean::New(isolate, stat.isSocket));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isSymbolicLink"),
+                 v8::Boolean::New(isolate, stat.isSymbolicLink));
+    } else {
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "dev"),
+                 v8::Number::New(isolate, (double) stat.dev));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ino"),
+                 v8::Number::New(isolate, (double) stat.ino));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mode"),
+                 v8::Int32::New(isolate, stat.mode));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "nlink"),
+                 v8::Number::New(isolate, (double) stat.nlink));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "uid"),
+                 v8::Int32::New(isolate, stat.uid));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "gid"),
+                 v8::Int32::New(isolate, stat.gid));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "rdev"),
+                 v8::Number::New(isolate, (double) stat.rdev));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "size"),
+                 v8::Number::New(isolate, (double) stat.size));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "blksize"),
+                 v8::Number::New(isolate, (double) stat.blksize));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "blocks"),
+                 v8::Number::New(isolate, (double) stat.blocks));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "atimeMs"),
+                 v8::Number::New(isolate, stat.atimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mtimeMs"),
+                 v8::Number::New(isolate, stat.mtimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ctimeMs"),
+                 v8::Number::New(isolate, stat.ctimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "birthtimeMs"),
+                 v8::Number::New(isolate, stat.birthtimeMs));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "birthtime"),
+                 v8::Number::New(isolate, stat.birthtime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "atime"),
+                 v8::Number::New(isolate, stat.atime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "mtime"),
+                 v8::Number::New(isolate, stat.mtime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "ctime"),
+                 v8::Number::New(isolate, stat.ctime));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isBlockDevice"),
+                 v8::Boolean::New(isolate, stat.isBlockDevice));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isCharacterDevice"),
+                 v8::Boolean::New(isolate, stat.isCharacterDevice));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isDirectory"),
+                 v8::Boolean::New(isolate, stat.isDirectory));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isFIFO"),
+                 v8::Boolean::New(isolate, stat.isFIFO));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isFile"),
+                 v8::Boolean::New(isolate, stat.isFile));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isSocket"),
+                 v8::Boolean::New(isolate, stat.isSocket));
+        ret->Set(ctx, Helpers::ConvertToV8String(isolate, "isSymbolicLink"),
+                 v8::Boolean::New(isolate, stat.isSymbolicLink));
+    }
+
+
+    return handle_scope.Escape(ret);
+}
+

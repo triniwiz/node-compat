@@ -18,6 +18,14 @@ public:
     static void ParseAppendFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
                                        org::nativescript::nodecompat::AppendFileOptions &options);
 
+    static void ParseMkDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                       org::nativescript::nodecompat::MkDirOptions &options);
+
+    static void ParseMkdTempOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                  org::nativescript::nodecompat::MkdTempOptions &options);
+
+    static v8::Local<v8::Object> FileStatToJS(v8::Isolate *isolate, bool bigInt, const org::nativescript::nodecompat::FileStat &stat);
+
     static void sendToADBLogcat(const std::string& message, android_LogPriority logPriority);
 
     static void LogToConsole(const std::string &message);
