@@ -27,8 +27,6 @@ public:
 
     static void CloseSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-    static void ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args);
-
     static void OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     static void ExistsSync(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -53,13 +51,47 @@ public:
 
     static void LinkSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-    static void StatSync(const v8::FunctionCallbackInfo<v8::Value> &args);
-
     static void MkdirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     static void MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     static void OpenDirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReaddirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadFileSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadLinkSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadvSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void RealpathSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void RenameSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void RmdirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void RmSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void StatSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void StatfsSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void SymlinkSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void TruncateSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void UnlinkSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void UtimesSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void WriteFileSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void WriteSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
 

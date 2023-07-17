@@ -127,6 +127,16 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             v8::FunctionTemplate::New(isolate, &OpenSync));
 
 
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "opendirSync"),
+            v8::FunctionTemplate::New(isolate, &OpenDirSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readdirSync"),
+            v8::FunctionTemplate::New(isolate, &ReaddirSync));
+
+
+
     cache->FsTmpl =
             std::make_unique<v8::Persistent<v8::FunctionTemplate>>(isolate, ctorTmpl);
 
@@ -758,3 +768,588 @@ void FSImpl::OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 
 }
+
+void FSImpl::ReaddirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    ReaddirOptions options{};
+
+    Helpers::ParseReaddirOptions(isolate, args[1], options);
+
+    try {
+        auto result = fs_readdir_sync(path, options);
+        auto size = result.size();
+        auto array = v8::Array::New(isolate, (int)size);
+        for(int32_t i = 0; i < size;i++){
+            auto value = &result[i];
+            auto type = fs_readdir_get_type(*value);
+
+            if(type == org::nativescript::nodecompat::ReaddirResultType::String){
+                auto string_value = fs_readdir_get_string_value(*value);
+                array->Set(ctx, i, Helpers::ConvertToV8String(isolate, string_value.c_str()));
+            }else {
+                auto buffer = fs_readdir_get_buffer_value(*value);
+
+                auto bufferImpl = new BufferImpl(std::move(buffer));
+                auto ext = v8::External::New(isolate, bufferImpl);
+
+                auto ctor = BufferImpl::GetCtor(isolate);
+                auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+                ret->SetInternalField(0, ext);
+                array->Set(ctx, i, ret);
+            }
+        }
+        args.GetReturnValue().Set(array);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+/*
+
+void FSImpl::ReadFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_read_file_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::ReadLinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_read_link_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::ReadvSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_readv_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::RealpathSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::RenameSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto oldPathValue = args[0];
+
+    std::string oldPath;
+
+    if (oldPathValue->IsString()) {
+        oldPath = Helpers::ConvertFromV8String(isolate, oldPathValue);
+    }
+
+    auto newPathValue = args[0];
+
+    std::string newPath;
+
+    if (newPathValue->IsString()) {
+        newPath = Helpers::ConvertFromV8String(isolate, newPathValue);
+    }
+
+    try {
+       fs_rename_sync(oldPath, newPath);
+        args.GetReturnValue().SetUndefined();
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::RmdirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_rmdir_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::RmSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::StatfsSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_fstat_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::SymlinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto targetValue = args[0];
+
+    std::string target;
+
+    if (targetValue->IsString()) {
+        target = Helpers::ConvertFromV8String(isolate, targetValue);
+    }
+
+    auto pathValue = args[1];
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto typeValue = args[2];
+    std::string type;
+
+    if (typeValue->IsString()) {
+        type = Helpers::ConvertFromV8String(isolate, typeValue);
+    }
+
+
+    try {
+        fs_symlink_sync(target, path, type);
+        args.GetReturnValue().SetUndefined();
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::TruncateSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::UnlinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::UtimesSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::WriteFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::WriteSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
+void FSImpl::WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_real_path_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+*/

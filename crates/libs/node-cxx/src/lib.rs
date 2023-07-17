@@ -385,6 +385,41 @@ fn buffer_read_double_le(buffer: &mut Buffer, offset: isize) -> f64 {
 #[derive(Debug)]
 pub struct FileDirent(node_fs::sync::FileDirent);
 
+fn fs_dirent_is_block_device(dirent: &FileDirent) -> bool {
+    dirent.0.is_block_device()
+}
+
+fn fs_dirent_path(dirent: &FileDirent) -> String {
+    dirent.0.path().to_string()
+}
+
+fn fs_dirent_name(dirent: &FileDirent) -> String {
+    dirent.0.name().to_string()
+}
+
+fn fs_dirent_is_character_device(dirent: &FileDirent) -> bool {
+    dirent.0.is_character_device()
+}
+
+fn fs_dirent_is_directory(dirent: &FileDirent) -> bool {
+    dirent.0.is_directory()
+}
+
+fn fs_dirent_is_fifo(dirent: &FileDirent) -> bool {
+    dirent.0.is_fifo()
+}
+
+fn fs_dirent_is_file(dirent: &FileDirent) -> bool {
+    dirent.0.is_file()
+}
+
+fn fs_dirent_is_socket(dirent: &FileDirent) -> bool {
+    dirent.0.is_socket()
+}
+
+fn fs_dirent_is_symbolic_link(dirent: &FileDirent) -> bool {
+    dirent.0.is_symbolic_link()
+}
 
 fn fs_dir_close_sync(dir: &FileDir)-> Result<()> {
     dir.0.close()
@@ -400,6 +435,27 @@ fn fs_dir_read_sync(dir: &FileDir) -> Result<Box<FileDirent>> {
         .map(|dirent| Box::new(FileDirent(dirent)))
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
+
+
+
+pub fn fs_readdir_get_type(value: &ReaddirResult) -> ffi::ReaddirResultType {
+    return value.get_type()
+}
+
+pub fn fs_readdir_get_string_value(value: &ReaddirResult) -> Result<String> {
+    return value.get_string_value()
+}
+
+pub fn fs_readdir_get_buffer_value(value: &ReaddirResult) -> Result<Box<Buffer>> {
+    return value.get_buffer_value()
+}
+
+pub fn fs_readdir_get_type_value(value: &ReaddirResult) -> Result<Box<FileDirent>> {
+    return value.get_type_value()
+}
+
+
+
 
 #[derive(Clone)]
 pub struct Metadata(std::fs::Metadata);
@@ -428,13 +484,13 @@ impl ReaddirResult {
         }
     }
 
-    pub fn get_buffer_value(&self) -> Result<node_buffer::Buffer> {
+    pub fn get_buffer_value(&self) -> Result<Box<Buffer>> {
         match self.0.get_buffer_value() {
             None => {
                 Err(node_core::error::generic_error("Invalid Type".to_string()))
             }
             Some(buffer) => {
-                Ok(buffer)
+                Ok(Box::new(Buffer(buffer)))
             }
         }
     }
@@ -688,12 +744,12 @@ impl FsEncoding {
         }
     }
 
-    pub fn get_buffer_value(&self) -> Result<Buffer> {
+    pub fn get_buffer_value(&self) -> Result<Box<Buffer>> {
         match self.0.get_buffer_value() {
             None => {
                 Err(node_core::error::generic_error("Invalid Type".to_string()))
             }
-            Some(buffer) => Ok(Buffer(buffer))
+            Some(buffer) => Ok(Box::new(Buffer(buffer)))
         }
     }
 }
@@ -3023,13 +3079,47 @@ pub mod ffi {
     }
 
     extern "Rust" {
-        type FileDirent;
         // fs dir
         fn fs_dir_close_sync(dir: &FileDir) -> Result<()>;
 
         fn fs_dir_path(dir: &FileDir) -> String;
 
         fn fs_dir_read_sync(dir: &FileDir) -> Result<Box<FileDirent>>;
+    }
+
+    extern "Rust" {
+        // fs readdir
+
+        pub fn fs_readdir_get_type(value: &ReaddirResult) -> ReaddirResultType;
+
+        pub fn fs_readdir_get_string_value(value: &ReaddirResult) -> Result<String>;
+
+        pub fn fs_readdir_get_buffer_value(value: &ReaddirResult) -> Result<Box<Buffer>>;
+
+        pub fn fs_readdir_get_type_value(value: &ReaddirResult) -> Result<Box<FileDirent>>;
+    }
+
+
+    extern "Rust" {
+        type FileDirent;
+        // fs dirent
+        fn fs_dirent_is_block_device(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_path(dir: &FileDirent) -> String;
+
+        fn fs_dirent_name(dir: &FileDirent) -> String;
+
+        fn fs_dirent_is_character_device(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_is_directory(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_is_fifo(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_is_file(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_is_socket(dir: &FileDirent) -> bool;
+
+        fn fs_dirent_is_symbolic_link(dir: &FileDirent) -> bool;
     }
 
 

@@ -74,15 +74,16 @@ impl FileDir {
     }
 
     pub fn read(&self) -> std::io::Result<FileDirent> {
-        let dir = unsafe { self.dir() };
-        let ret = unsafe { libc::readdir(*dir) };
+        let lock = self.0.0.read();
+        let dir = unsafe { lock.1.as_ptr() };
+        let ret = unsafe { libc::readdir(dir) };
 
         if ret.is_null() {
             let last_error = std::io::Error::last_os_error();
             return Err(last_error);
         }
 
-        Ok(FileDirent::new_raw(ret))
+        Ok(FileDirent::new_raw(lock.0.clone(), ret))
     }
 
     pub fn read_async(

@@ -8,7 +8,7 @@ use libc::size_t;
 
 #[derive(Debug)]
 pub enum FileDirentInner {
-    Raw(*mut c_void),
+    Raw(String,*mut c_void),
     Regular(fs::DirEntry),
 }
 
@@ -20,13 +20,13 @@ impl FileDirent {
         Self(Arc::new(FileDirentInner::Regular(dir)))
     }
 
-    pub fn new_raw(dir: *mut libc::dirent) -> Self {
-        Self(Arc::new(FileDirentInner::Raw(dir as *mut c_void)))
+    pub fn new_raw(path: String, dir: *mut libc::dirent) -> Self {
+        Self(Arc::new(FileDirentInner::Raw(path, dir as *mut c_void)))
     }
 
     pub fn name<'a>(&self) -> Cow<'a, str> {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 CStr::from_ptr((*raw).d_name.as_ptr()).to_string_lossy()
             },
@@ -36,9 +36,20 @@ impl FileDirent {
         }
     }
 
+    pub fn path<'a>(&self) -> Cow<'a, str> {
+        match self.0.as_ref() {
+            FileDirentInner::Raw(path,_) => unsafe {
+                Cow::from(path)
+            },
+            FileDirentInner::Regular(reg) => {
+                Cow::from(reg.path().to_string_lossy().as_ref().to_string())
+            }
+        }
+    }
+
     pub fn is_block_device(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_BLK
             },
@@ -48,7 +59,7 @@ impl FileDirent {
 
     pub fn is_character_device(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_CHR
             },
@@ -58,7 +69,7 @@ impl FileDirent {
 
     pub fn is_directory(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_DIR
             },
@@ -68,7 +79,7 @@ impl FileDirent {
 
     pub fn is_fifo(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_FIFO
             },
@@ -78,7 +89,7 @@ impl FileDirent {
 
     pub fn is_file(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_REG
             },
@@ -88,7 +99,7 @@ impl FileDirent {
 
     pub fn is_socket(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_SOCK
             },
@@ -98,7 +109,7 @@ impl FileDirent {
 
     pub fn is_symbolic_link(&self) -> bool {
         match self.0.as_ref() {
-            FileDirentInner::Raw(raw) => unsafe {
+            FileDirentInner::Raw(_, raw) => unsafe {
                 let raw = (*raw) as *mut libc::dirent;
                 (*raw).d_type == libc::DT_LNK
             },
@@ -109,7 +120,7 @@ impl FileDirent {
 
 impl Drop for FileDirent {
     fn drop(&mut self) {
-        if let FileDirentInner::Raw(value) = self.0.as_ref() {
+        if let FileDirentInner::Raw(_, value) = self.0.as_ref() {
             if value.is_null() {
                 unsafe {
                     libc::free(*value);

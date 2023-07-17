@@ -15,6 +15,8 @@ public:
 
     static org::nativescript::nodecompat::StringEncoding ParseEncoding(v8::Isolate *isolate, const v8::Local<v8::Value> &value, org::nativescript::nodecompat::StringEncoding defaultValue);
 
+    static org::nativescript::nodecompat::FsEncodingType ParseFsEncoding(v8::Isolate *isolate, const v8::Local<v8::Value> &value, org::nativescript::nodecompat::FsEncodingType defaultValue);
+
     static void ParseAppendFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
                                        org::nativescript::nodecompat::AppendFileOptions &options);
 
@@ -26,6 +28,9 @@ public:
 
     static void ParseOpenDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
                                       org::nativescript::nodecompat::OpenDirOptions &options);
+
+    static void ParseReaddirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                    org::nativescript::nodecompat::ReaddirOptions &options);
 
     static v8::Local<v8::Object> FileStatToJS(v8::Isolate *isolate, bool bigInt, const org::nativescript::nodecompat::FileStat &stat);
 
