@@ -7,6 +7,7 @@
 
 #include "Common.h"
 #include "node-cxx/src/lib.rs.h"
+#include "fcntl.h"
 
 using namespace org::nativescript::nodecompat;
 
@@ -57,6 +58,8 @@ public:
     static void MkdirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     static void MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void OpenDirSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
 

@@ -32,6 +32,9 @@ public:
 
     std::unique_ptr <v8::Persistent<v8::FunctionTemplate>> FsStatTmpl = std::unique_ptr<v8::Persistent<v8::FunctionTemplate>>(
             nullptr);
+
+    std::unique_ptr <v8::Persistent<v8::FunctionTemplate>> FsDirTmpl = std::unique_ptr<v8::Persistent<v8::FunctionTemplate>>(
+            nullptr);
 private:
     static std::shared_ptr <ConcurrentMap<v8::Isolate *,
             std::shared_ptr < Caches>>>

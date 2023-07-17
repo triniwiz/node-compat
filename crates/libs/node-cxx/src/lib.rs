@@ -3,7 +3,6 @@ extern crate alloc;
 use std::borrow::Cow;
 use std::ffi::{c_void, CString};
 use std::sync::Arc;
-use node_fs::file_dirent::FileDirent;
 use node_fs::prelude::{FsEncodingType, handle_meta};
 use node_core::error::Result;
 
@@ -383,6 +382,24 @@ fn buffer_read_double_le(buffer: &mut Buffer, offset: isize) -> f64 {
     buffer.0.read_double_le(to_optional(offset))
 }
 
+#[derive(Debug)]
+pub struct FileDirent(node_fs::sync::FileDirent);
+
+
+fn fs_dir_close_sync(dir: &FileDir)-> Result<()> {
+    dir.0.close()
+        .map_err(|e| node_core::error::error_from_io_error(e))
+}
+
+fn fs_dir_path(dir: &FileDir) -> String {
+    dir.0.path().to_string()
+}
+
+fn fs_dir_read_sync(dir: &FileDir) -> Result<Box<FileDirent>> {
+    dir.0.read()
+        .map(|dirent| Box::new(FileDirent(dirent)))
+        .map_err(|e| node_core::error::error_from_io_error(e))
+}
 
 #[derive(Clone)]
 pub struct Metadata(std::fs::Metadata);
@@ -422,13 +439,13 @@ impl ReaddirResult {
         }
     }
 
-    pub fn get_type_value(&self) -> Result<FileDirent> {
+    pub fn get_type_value(&self) -> Result<Box<FileDirent>> {
         match self.0.get_type_value() {
             None => {
                 Err(node_core::error::generic_error("Invalid Type".to_string()))
             }
             Some(dirent) => {
-                Ok(dirent)
+                Ok(Box::new(FileDirent(dirent)))
             }
         }
     }
@@ -3003,6 +3020,16 @@ pub mod ffi {
 
         #[namespace = ""]
         type c_void;
+    }
+
+    extern "Rust" {
+        type FileDirent;
+        // fs dir
+        fn fs_dir_close_sync(dir: &FileDir) -> Result<()>;
+
+        fn fs_dir_path(dir: &FileDir) -> String;
+
+        fn fs_dir_read_sync(dir: &FileDir) -> Result<Box<FileDirent>>;
     }
 
 

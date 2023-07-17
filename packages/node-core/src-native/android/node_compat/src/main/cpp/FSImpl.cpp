@@ -6,6 +6,7 @@
 #include "FSImpl.h"
 #include "Caches.h"
 #include "BufferImpl.h"
+#include "FileDirImpl.h"
 
 void FSImpl::Init(v8::Isolate *isolate) {
     v8::Locker locker(isolate);
@@ -120,6 +121,10 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
     ctorTmpl->Set(
             Helpers::ConvertToV8String(isolate, "mkdtempSync"),
             v8::FunctionTemplate::New(isolate, &MkdtempSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "openSync"),
+            v8::FunctionTemplate::New(isolate, &OpenSync));
 
 
     cache->FsTmpl =
@@ -426,7 +431,7 @@ void FSImpl::LchmodSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     uint32_t mode = 0;
     auto modeValue = args[1];
 
-    if(modeValue->IsUint32()){
+    if (modeValue->IsUint32()) {
         mode = modeValue->Uint32Value(ctx).ToChecked();
     }
 
@@ -449,14 +454,14 @@ void FSImpl::LchownSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     uint32_t uid = 0;
     auto uidValue = args[1];
 
-    if(uidValue->IsUint32()){
+    if (uidValue->IsUint32()) {
         uid = uidValue->Uint32Value(ctx).ToChecked();
     }
 
     uint32_t gid = 0;
     auto gidValue = args[1];
 
-    if(gidValue->IsUint32()){
+    if (gidValue->IsUint32()) {
         gid = gidValue->Uint32Value(ctx).ToChecked();
     }
 
@@ -481,22 +486,22 @@ void FSImpl::LutimesSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
     auto atimeValue = args[1];
 
-    if(atimeValue->IsBigInt()){
+    if (atimeValue->IsBigInt()) {
         atime = atimeValue->ToBigInt(ctx).ToLocalChecked()->Int64Value();
-    }else if(atimeValue->IsDate()){
-        atime = (int64_t)atimeValue.As<v8::Date>()->ValueOf();
-    }else {
-        atime = (int64_t)atimeValue->NumberValue(ctx).ToChecked();
+    } else if (atimeValue->IsDate()) {
+        atime = (int64_t) atimeValue.As<v8::Date>()->ValueOf();
+    } else {
+        atime = (int64_t) atimeValue->NumberValue(ctx).ToChecked();
     }
 
     auto mtimeValue = args[1];
 
-    if(mtimeValue->IsBigInt()){
+    if (mtimeValue->IsBigInt()) {
         mtime = mtimeValue->ToBigInt(ctx).ToLocalChecked()->Int64Value();
-    }else if(mtimeValue->IsDate()){
-        mtime = (int64_t)mtimeValue.As<v8::Date>()->ValueOf();
-    }else {
-        mtime = (int64_t)mtimeValue->NumberValue(ctx).ToChecked();
+    } else if (mtimeValue->IsDate()) {
+        mtime = (int64_t) mtimeValue.As<v8::Date>()->ValueOf();
+    } else {
+        mtime = (int64_t) mtimeValue->NumberValue(ctx).ToChecked();
     }
 
 
@@ -561,7 +566,7 @@ void FSImpl::MkdirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    MkDirOptions options {};
+    MkDirOptions options{};
 
     Helpers::ParseMkDirOptions(isolate, args[1], options);
 
@@ -583,8 +588,7 @@ void FSImpl::MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 
 
-
-    MkdTempOptions options {};
+    MkdTempOptions options{};
 
     Helpers::ParseMkdTempOptions(isolate, args[1], options);
 
@@ -612,6 +616,25 @@ void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 
     auto bufferValue = args[1];
+
+    auto offsetValue = args[2];
+
+    if (offsetValue->IsNumber()) {
+        offset = (size_t) offsetValue->NumberValue(ctx).ToChecked();
+    }
+
+    auto lengthValue = args[3];
+    if (lengthValue->IsNumber()) {
+        length = (size_t) lengthValue->NumberValue(ctx).ToChecked();
+    }
+
+    auto positionValue = args[4];
+
+    if (positionValue->IsBigInt()) {
+        position = (rust::isize) positionValue->ToBigInt(ctx).ToLocalChecked()->Int64Value();
+    } else if (positionValue->IsNumber()) {
+
+    }
 
     if (bufferValue->IsTypedArray()) {
         auto array = bufferValue.As<v8::TypedArray>();
@@ -667,13 +690,71 @@ void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 }
 
+void FSImpl::OpenDirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    OpenDirOptions options{};
+    Helpers::ParseOpenDirOptions(isolate, args[1], options);
+
+    try {
+        auto dir = fs_opendir_sync(path, options);
+        auto ctor = FileDirImpl::GetCtor(isolate)->New(isolate);
+        auto func = ctor->GetFunction(ctx).ToLocalChecked();
+        auto ret = func->NewInstance(ctx).ToLocalChecked();
+        auto fileDirImpl = new FileDirImpl(std::move(dir));
+        auto ext = v8::External::New(isolate, fileDirImpl);
+        ret->SetInternalField(0, ext);
+
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
+
+}
+
 void FSImpl::OpenSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto value = args[0];
+    auto pathValue = args[0];
+
+    std::string path;
+
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
     auto flagValue = args[1];
-    std::string flag("r");
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
     auto modeValue = args[2];
-    //fs_open_sync()
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    try {
+        auto ret = fs_open_sync(path, flag, mode);
+        args.GetReturnValue().Set(ret);
+        return;
+    } catch (std::exception &error) {
+        auto err = v8::Exception::Error(
+                Helpers::ConvertToV8String(isolate, error.what()));
+        isolate->ThrowException(err);
+    }
 
 }

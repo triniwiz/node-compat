@@ -24,6 +24,9 @@ public:
     static void ParseMkdTempOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
                                   org::nativescript::nodecompat::MkdTempOptions &options);
 
+    static void ParseOpenDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                      org::nativescript::nodecompat::OpenDirOptions &options);
+
     static v8::Local<v8::Object> FileStatToJS(v8::Isolate *isolate, bool bigInt, const org::nativescript::nodecompat::FileStat &stat);
 
     static void sendToADBLogcat(const std::string& message, android_LogPriority logPriority);
