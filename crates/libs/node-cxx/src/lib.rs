@@ -382,8 +382,21 @@ fn buffer_read_double_le(buffer: &mut Buffer, offset: isize) -> f64 {
     buffer.0.read_double_le(to_optional(offset))
 }
 
+
+fn fs_encoding_get_string_value(encoding: &FsEncoding) -> Result<String> {
+    encoding.get_string_value()
+}
+
+fn fs_encoding_get_buffer_value(encoding: &FsEncoding) -> Result<Box<Buffer>> {
+    encoding.get_buffer_value()
+}
+
+fn fs_encoding_is_buffer(encoding: &FsEncoding) -> bool {
+    encoding.is_buffer()
+}
+
 #[derive(Debug)]
-pub struct FileDirent(node_fs::sync::FileDirent);
+pub struct FileDirent(node_fs::file_dirent::FileDirent);
 
 fn fs_dirent_is_block_device(dirent: &FileDirent) -> bool {
     dirent.0.is_block_device()
@@ -421,7 +434,7 @@ fn fs_dirent_is_symbolic_link(dirent: &FileDirent) -> bool {
     dirent.0.is_symbolic_link()
 }
 
-fn fs_dir_close_sync(dir: &FileDir)-> Result<()> {
+fn fs_dir_close_sync(dir: &FileDir) -> Result<()> {
     dir.0.close()
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
@@ -437,24 +450,21 @@ fn fs_dir_read_sync(dir: &FileDir) -> Result<Box<FileDirent>> {
 }
 
 
-
 pub fn fs_readdir_get_type(value: &ReaddirResult) -> ffi::ReaddirResultType {
-    return value.get_type()
+    return value.get_type();
 }
 
 pub fn fs_readdir_get_string_value(value: &ReaddirResult) -> Result<String> {
-    return value.get_string_value()
+    return value.get_string_value();
 }
 
 pub fn fs_readdir_get_buffer_value(value: &ReaddirResult) -> Result<Box<Buffer>> {
-    return value.get_buffer_value()
+    return value.get_buffer_value();
 }
 
 pub fn fs_readdir_get_type_value(value: &ReaddirResult) -> Result<Box<FileDirent>> {
-    return value.get_type_value()
+    return value.get_type_value();
 }
-
-
 
 
 #[derive(Clone)]
@@ -640,8 +650,8 @@ fn fs_link_sync(existing_path: &str, new_path: &str) -> Result<()> {
 fn fs_lstat_sync(path: &str) -> Result<ffi::FileStat> {
     node_fs::sync::lstat(path)
         .map(|metadata| {
-        unsafe { std::mem::transmute(handle_meta(&metadata)) }
-    })
+            unsafe { std::mem::transmute(handle_meta(&metadata)) }
+        })
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
 
@@ -735,6 +745,12 @@ fn fs_readdir_sync(path: &str, options: ffi::ReaddirOptions) -> Result<Vec<Readd
 pub struct FsEncoding(node_fs::FsEncoding);
 
 impl FsEncoding {
+    pub fn is_buffer(&self)-> bool {
+        match &self.0 {
+            node_fs::FsEncoding::String(_) => false,
+            node_fs::FsEncoding::Buffer(_) => true
+        }
+    }
     pub fn get_string_value(&self) -> Result<String> {
         match self.0.get_string_value() {
             Some(value) => { Ok(value.to_string_lossy().to_string()) }
@@ -774,6 +790,15 @@ fn fs_read_link_sync(path: &str, options: ffi::ReadLinkOptions) -> Result<Box<Fs
 
 fn fs_readv_sync(fd: i32, buffers: &mut [Buffer], position: i64) -> Result<usize> {
     let mut buffers = buffers.iter().map(|buffer| buffer.0.clone())
+        .collect::<Vec<node_buffer::Buffer>>();
+    node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
+        .map_err(|e| node_core::error::error_from_io_error(e))
+}
+
+fn fs_readv_sync_slice(fd: i32, buffers: &[&mut[u8]], position: i64) -> Result<usize> {
+    let mut buffers = buffers.iter().map(|buffer| {
+        unsafe { node_buffer::Buffer::from_reference((*buffer).as_ptr() as *mut _, buffer.len())}
+    })
         .collect::<Vec<node_buffer::Buffer>>();
     node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
         .map_err(|e| node_core::error::error_from_io_error(e))
@@ -903,6 +928,13 @@ fn fs_writev_sync(fd: i32, mut buffers: Vec<Buffer>, position: i64) -> Result<us
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
 
+
+fn fs_writev_sync_slice(fd: i32, buffers: &[&[u8]], position: i64) -> Result<usize> {
+    node_fs::sync::writev_slice(
+        fd, buffers, position.try_into().unwrap(),
+    )
+        .map_err(|e| node_core::error::error_from_io_error(e))
+}
 
 // async
 
@@ -2933,7 +2965,6 @@ fn fs_async_create_async_fs_file_handle_closure(on_success: *mut ffi::c_void, on
 
 #[cxx::bridge(namespace = "org::nativescript::nodecompat")]
 pub mod ffi {
-
     #[derive(Copy, Clone, Debug)]
     pub struct WriteFileOptions {
         encoding: StringEncoding,
@@ -3076,6 +3107,14 @@ pub mod ffi {
 
         #[namespace = ""]
         type c_void;
+    }
+
+    extern "Rust" {
+        fn fs_encoding_is_buffer(encoding: &FsEncoding) -> bool;
+
+        fn fs_encoding_get_string_value(encoding: &FsEncoding) -> Result<String>;
+
+        fn fs_encoding_get_buffer_value(encoding: &FsEncoding) -> Result<Box<Buffer>>;
     }
 
     extern "Rust" {
@@ -3333,6 +3372,8 @@ pub mod ffi {
 
         fn fs_readv_sync(fd: i32, buffers: &mut [Buffer], position: i64) -> Result<usize>;
 
+        fn fs_readv_sync_slice(fd: i32, buffers: &[&mut[u8]], position: i64) -> Result<usize>;
+
         fn fs_real_path_sync(path: &str, options: RealPathOptions) -> Result<String>;
 
         fn fs_rename_sync(old_path: &str, new_path: &str) -> Result<()>;
@@ -3393,6 +3434,8 @@ pub mod ffi {
         ) -> Result<()>;
 
         fn fs_writev_sync(fd: i32, buffers: Vec<Buffer>, position: i64) -> Result<usize>;
+
+        fn fs_writev_sync_slice(fd: i32, buffers: &[&[u8]], position: i64) -> Result<usize>;
     }
 
     extern "Rust" {

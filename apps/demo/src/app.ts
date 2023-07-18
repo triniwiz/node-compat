@@ -159,7 +159,25 @@ try {
   console.time('statSync');
   const stat = fs.statSync(file.getAbsolutePath(), { bigint: true });
   console.timeEnd('statSync');
-  console.log('statSync ', stat);
+  console.log(
+    'statSync ',
+    JSON.stringify(stat, (key, value) => {
+      if (value && typeof value === 'object') {
+        const ret = {};
+        Object.keys(value).forEach((key) => {
+          const item = value[key];
+          if (typeof item === 'bigint') {
+            ret[key] = item.toString();
+          } else {
+            ret[key] = item;
+          }
+        });
+
+        return ret;
+      }
+      return value;
+    })
+  );
 } catch (err) {
   console.log(err);
   /* Handle the error */

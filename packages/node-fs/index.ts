@@ -28,7 +28,15 @@ export interface IFileStat {
   isSymbolicLink: boolean;
 }
 
-export function parseFlags(flags: string) {
+const O_APPEND = 8;
+const O_CREAT = 512;
+const O_EXCL = 2048;
+const O_RDONLY = 0;
+const O_WRONLY = 1;
+const O_DSYNC = 0x00400000;
+const O_TRUNC = 1024;
+
+function parseFlags(flags: string) {
   let ret = 0;
   switch (flags) {
     case 'a':
@@ -231,16 +239,6 @@ class Fs {
     return NSCFS.linkSync(existingPath, newPath);
   }
 
-  static statSync(path: string | Buffer | URL, options?: { bigint?: boolean }) {
-    if (path instanceof Buffer) {
-      path = path.toString('utf-8');
-    } else {
-      path = path.toString();
-    }
-
-    return NSCFS.statSync(path, options);
-  }
-
   static mkdirSync(path: string | Buffer | URL, options?: { recursive?: boolean; mode: string | number }) {
     if (path instanceof Buffer) {
       path = path.toString('utf-8');
@@ -252,13 +250,232 @@ class Fs {
   }
 
   static mkdtempSync(prefix: string, options?: { encoding?: string }) {
+    return NSCFS.mkdtempSync(prefix, options);
+  }
+
+  static opendirSync(path: string | Buffer | URL, options?: { encoding?: string | null; bufferSize?: number; recursive?: boolean }) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.opendirSync(path, options);
+  }
+
+  static openSync(path: string | Buffer | URL, flags: string | number, mode: number): number {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.openSync(path, flags, mode);
+  }
+
+  static readdirSync(
+    path: string | Buffer | URL,
+    options?: {
+      encoding?: string;
+      withFileTypes?: boolean;
+      recursive?: boolean;
+    }
+  ): string[] | Buffer[] | Dirent[] {
     if (path instanceof Buffer) {
       path = path.toString('utf-8');
     } else {
       path = path.toString();
     }
 
-    return NSCFS.mkdtempSync(prefix, options);
+    return NSCFS.readdirSync(path, options);
+  }
+
+  static readFileSync(
+    path: string | Buffer | URL,
+    options?: {
+      encoding?: string | null;
+      flag?: string;
+    }
+  ): string | Buffer {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.readFileSync(path, options);
+  }
+
+  static readlinkSync(path: string | Buffer | URL, options?: { encoding?: string }): string | Buffer {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.readlinkSync(path, options);
+  }
+
+  static readSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | BigInt): number {
+    return NSCFS.readSync(fd, buffer, (offset = 0), (length = -1), position ?? 0);
+  }
+
+  static readvSync(fd: number, buffers: ArrayBufferView[], position?: number): number {
+    return NSCFS.readvSync(fd, buffers, position ?? 0);
+  }
+
+  static realpathSync(path: string | Buffer | URL, options?: { encoding?: string }): string | Buffer {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.realpathSync(path, options);
+  }
+
+  // static realpathSync.native(path[, options])
+
+  static renameSync(oldPath: string | Buffer | URL, newPath: string | Buffer | URL) {
+    if (oldPath instanceof Buffer) {
+      oldPath = oldPath.toString('utf-8');
+    } else {
+      oldPath = oldPath.toString();
+    }
+
+    if (newPath instanceof Buffer) {
+      newPath = newPath.toString('utf-8');
+    } else {
+      newPath = newPath.toString();
+    }
+
+    return NSCFS.renameSync(oldPath, newPath);
+  }
+
+  static rmdirSync(
+    path: string | Buffer | URL,
+    options?: {
+      maxRetries?: number;
+      recursive?: boolean;
+      retryDelay?: number;
+    }
+  ) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.rmdirSync(path, options);
+  }
+
+  static rmSync(
+    path: string | Buffer | URL,
+    options?: {
+      force?: boolean;
+      maxRetries?: number;
+      recursive?: boolean;
+      retryDelay?: number;
+    }
+  ) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.rmSync(path, options);
+  }
+
+  static statSync(
+    path: string | Buffer | URL,
+    options?: {
+      bigint?: boolean;
+      throwIfNoEntry?: boolean;
+    }
+  ): Stats {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.statSync(path, options);
+  }
+
+  static statfsSync(path: string | Buffer | URL, options?: { bigint?: boolean }) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.statSync(path, options);
+  }
+
+  static symlinkSync(target: string | Buffer | URL, path: string | Buffer | URL, type: string | null) {
+    if (target instanceof Buffer) {
+      target = target.toString('utf-8');
+    } else {
+      target = target.toString();
+    }
+
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+
+    return NSCFS.symlinkSync(target, path, type);
+  }
+
+  static truncateSync(path: string | Buffer | URL, len: number) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.truncateSync(path, len ?? 0);
+  }
+
+  static unlinkSync(path: string | Buffer | URL) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.unlinkSync(path);
+  }
+
+  static utimesSync(path: string | Buffer | URL, atime: number | string | Date, mtime: number | string | Date) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else {
+      path = path.toString();
+    }
+    return NSCFS.utimesSync(path, atime, mtime);
+  }
+
+  static writeFileSync(
+    file: string | Buffer | URL | number,
+    data: string | Buffer | ArrayBufferView | DataView,
+    options?: {
+      encoding?: string | null;
+      mode?: number;
+      flag?: string;
+    }
+  ) {
+    if (file instanceof Buffer) {
+      file = file.toString('utf-8');
+    } else if (typeof file !== 'number') {
+      file = file.toString();
+    }
+    return NSCFS.writeFileSync(file, data, options);
+  }
+
+  static writeSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset: number, length: number, position: number): number {
+    return NSCFS.writeSync(fd, buffer, offset ?? 0, length ?? -1, position ?? 0);
+  }
+
+  static writevSync(fd: number, buffers: ArrayBufferView[], position?: number): number {
+    return NSCFS.writevSync(fd, buffers, position ?? 0);
   }
 }
 
@@ -274,17 +491,29 @@ export const fchmodSync = Fs.fchmodSync;
 export const fchownSync = Fs.fchownSync;
 export const fdatasyncSync = Fs.fdatasyncSync;
 export const fstatSync = Fs.fstatSync;
-
 export const lchmodSync = Fs.lchmodSync;
-
 export const lchownSync = Fs.lchownSync;
-
 export const lutimesSync = Fs.lutimesSync;
-
 export const linkSync = Fs.linkSync;
-
-export const statSync = Fs.statSync;
-
 export const mkdirSync = Fs.mkdirSync;
-
 export const mkdtempSync = Fs.mkdtempSync;
+export const opendirSync = Fs.opendirSync;
+export const openSync = Fs.openSync;
+export const readdirSync = Fs.readdirSync;
+export const readFileSync = Fs.readFileSync;
+export const readlinkSync = Fs.readlinkSync;
+export const readSync = Fs.readSync;
+export const readvSync = Fs.readvSync;
+export const realpathSync = Fs.realpathSync;
+export const renameSync = Fs.renameSync;
+export const rmdirSync = Fs.rmdirSync;
+export const rmSync = Fs.rmSync;
+export const statSync = Fs.statSync;
+export const statfsSync = Fs.statfsSync;
+export const symlinkSync = Fs.symlinkSync;
+export const truncateSync = Fs.truncateSync;
+export const unlinkSync = Fs.unlinkSync;
+export const utimesSync = Fs.utimesSync;
+export const writeFileSync = Fs.writeFileSync;
+export const writeSync = Fs.writeSync;
+export const writevSync = Fs.writevSync;

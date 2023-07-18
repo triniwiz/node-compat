@@ -39,7 +39,7 @@ impl FileDirent {
     pub fn path<'a>(&self) -> Cow<'a, str> {
         match self.0.as_ref() {
             FileDirentInner::Raw(path,_) => unsafe {
-                Cow::from(path)
+                Cow::from(path.to_string())
             },
             FileDirentInner::Regular(reg) => {
                 Cow::from(reg.path().to_string_lossy().as_ref().to_string())

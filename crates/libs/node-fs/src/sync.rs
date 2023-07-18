@@ -1311,6 +1311,23 @@ pub fn writev(fd: c_int, mut buffers: Vec<Buffer>, position: c_long) -> std::io:
     file.write_vectored(buffers.as_slice())
 }
 
+pub fn writev_slice(
+    fd: c_int,
+    buffer: &[&[u8]],
+    position: c_long,
+) -> std::io::Result<usize> {
+    let mut slice_buf = Vec::with_capacity(buffer.len());
+    unsafe {
+        for item in buffer.iter() {
+            let item = &*(*item);
+            slice_buf.push(Buffer::from_reference(item.as_ptr() as *mut _, item.len()))
+        }
+    }
+
+    writev(fd, slice_buf, position)
+}
+
+
 pub fn writev_raw(
     fd: c_int,
     buffer: *const *const Buffer,

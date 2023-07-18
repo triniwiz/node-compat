@@ -417,6 +417,211 @@ void Helpers::ParseReaddirOptions(v8::Isolate *isolate, const v8::Local<v8::Valu
 }
 
 
+void Helpers::ParseReadFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                  org::nativescript::nodecompat::ReadFileOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseFsEncoding(isolate, encodingValue,
+                                               org::nativescript::nodecompat::FsEncodingType::Utf8);
+        }
+
+        v8::Local<v8::Value> flagValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "flag")).ToLocal(&flagValue);
+
+
+        if (flagValue->IsNumber()) {
+            options.flag = (int32_t) flagValue->NumberValue(ctx).ToChecked();
+        }
+
+    }
+}
+
+void Helpers::ParseReadLinkOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                   org::nativescript::nodecompat::ReadLinkOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseFsEncoding(isolate, encodingValue,
+                                               org::nativescript::nodecompat::FsEncodingType::Utf8);
+        }
+    }
+}
+
+void Helpers::ParseRealPathOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                   org::nativescript::nodecompat::RealPathOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseEncoding(isolate, encodingValue,
+                                               org::nativescript::nodecompat::StringEncoding::Utf8);
+        }
+    }
+}
+
+
+void Helpers::ParseRmDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                   org::nativescript::nodecompat::RmDirOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> recursiveValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "recursive")).ToLocal(&recursiveValue);
+
+        if (recursiveValue->IsBoolean()) {
+            options.recursive = recursiveValue->BooleanValue(isolate);
+        }
+
+
+        v8::Local<v8::Value> maxRetriedValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "max_retries")).ToLocal(&maxRetriedValue);
+
+        if (recursiveValue->IsInt32()) {
+            options.max_retries = maxRetriedValue->Int32Value(ctx).ToChecked();
+        }
+
+
+        v8::Local<v8::Value> retryDelayValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "retry_delay")).ToLocal(&retryDelayValue);
+
+        if (retryDelayValue->IsNumber()) {
+            options.retry_delay = (uint64_t)maxRetriedValue->NumberValue(ctx).ToChecked();
+        }
+
+
+
+    }
+}
+
+void Helpers::ParseRmOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                org::nativescript::nodecompat::RmOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> recursiveValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "recursive")).ToLocal(&recursiveValue);
+
+        if (recursiveValue->IsBoolean()) {
+            options.recursive = recursiveValue->BooleanValue(isolate);
+        }
+
+
+        v8::Local<v8::Value> maxRetriedValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "max_retries")).ToLocal(&maxRetriedValue);
+
+        if (recursiveValue->IsInt32()) {
+            options.max_retries = maxRetriedValue->Int32Value(ctx).ToChecked();
+        }
+
+
+        v8::Local<v8::Value> retryDelayValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "retry_delay")).ToLocal(&retryDelayValue);
+
+        if (retryDelayValue->IsNumber()) {
+            options.retry_delay = (uint64_t)maxRetriedValue->NumberValue(ctx).ToChecked();
+        }
+
+
+        v8::Local<v8::Value> forceValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "force")).ToLocal(&retryDelayValue);
+
+        if (forceValue->IsBoolean()) {
+            options.force = forceValue->BooleanValue(isolate);
+        }
+
+
+
+    }
+}
+
+
+void Helpers::ParseWriteFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                             org::nativescript::nodecompat::WriteFileOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+
+        v8::Local<v8::Value> encodingValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "encoding")).ToLocal(&encodingValue);
+
+        if (encodingValue->IsString()) {
+            options.encoding = ParseEncoding(isolate, encodingValue,
+                                             org::nativescript::nodecompat::StringEncoding::Utf8);
+        }
+
+        v8::Local<v8::Value> modeValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "mode")).ToLocal(&modeValue);
+
+        if (modeValue->IsNumber()) {
+            options.mode = (int32_t) modeValue->NumberValue(ctx).ToChecked();
+        }
+
+
+        v8::Local<v8::Value> flagValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "flag")).ToLocal(&flagValue);
+
+
+        if (flagValue->IsNumber()) {
+            options.flag = (int32_t) flagValue->NumberValue(ctx).ToChecked();
+        }
+
+    }
+}
+
+
+void Helpers::ParseWriteOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                    org::nativescript::nodecompat::WriteOptions &options) {
+    if (value->IsObject() && !value->IsNullOrUndefined()) {
+        auto ctx = isolate->GetCurrentContext();
+        auto val = value.As<v8::Object>();
+
+        v8::Local<v8::Value> offsetValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "offset")).ToLocal(&offsetValue);
+
+        if (offsetValue->IsNumber()) {
+            options.offset = (size_t)offsetValue->NumberValue(ctx).ToChecked();
+        }
+
+        v8::Local<v8::Value> lengthValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "length")).ToLocal(&lengthValue);
+
+        if (lengthValue->IsNumber()) {
+            options.length = (size_t)lengthValue->NumberValue(ctx).ToChecked();
+        }
+
+        v8::Local<v8::Value> positionValue;
+        val->Get(ctx, Helpers::ConvertToV8String(isolate, "position")).ToLocal(&positionValue);
+
+        if (positionValue->IsNumber()) {
+            options.position = (rust::isize)positionValue->NumberValue(ctx).ToChecked();
+        }
+
+    }
+}
+
 v8::Local<v8::Object>
 Helpers::FileStatToJS(v8::Isolate *isolate, bool bigInt,
                       const org::nativescript::nodecompat::FileStat &stat) {

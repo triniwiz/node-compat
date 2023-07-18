@@ -32,6 +32,31 @@ public:
     static void ParseReaddirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
                                     org::nativescript::nodecompat::ReaddirOptions &options);
 
+    static void ParseReadFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                    org::nativescript::nodecompat::ReadFileOptions &options);
+
+    static void ParseReadLinkOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                     org::nativescript::nodecompat::ReadLinkOptions &options);
+
+    static void ParseRealPathOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                     org::nativescript::nodecompat::RealPathOptions &options);
+
+    static void ParseRmDirOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                     org::nativescript::nodecompat::RmDirOptions &options);
+
+    static void ParseRmOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                  org::nativescript::nodecompat::RmOptions &options);
+
+
+    static void ParseWriteFileOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                               org::nativescript::nodecompat::WriteFileOptions &options);
+
+
+
+    static void ParseWriteOptions(v8::Isolate *isolate, const v8::Local<v8::Value> &value,
+                                      org::nativescript::nodecompat::WriteOptions &options);
+
+
     static v8::Local<v8::Object> FileStatToJS(v8::Isolate *isolate, bool bigInt, const org::nativescript::nodecompat::FileStat &stat);
 
     static void sendToADBLogcat(const std::string& message, android_LogPriority logPriority);

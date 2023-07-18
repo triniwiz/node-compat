@@ -135,6 +135,72 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "readdirSync"),
             v8::FunctionTemplate::New(isolate, &ReaddirSync));
 
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readFileSync"),
+            v8::FunctionTemplate::New(isolate, &ReadFileSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readLinkSync"),
+            v8::FunctionTemplate::New(isolate, &ReadLinkSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "readvSync"),
+            v8::FunctionTemplate::New(isolate, &ReadvSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "realpathSync"),
+            v8::FunctionTemplate::New(isolate, &RealpathSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "renameSync"),
+            v8::FunctionTemplate::New(isolate, &RenameSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "rmdirSync"),
+            v8::FunctionTemplate::New(isolate, &RmdirSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "rmSync"),
+            v8::FunctionTemplate::New(isolate, &RmSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "statfsSync"),
+            v8::FunctionTemplate::New(isolate, &StatfsSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "symlinkSync"),
+            v8::FunctionTemplate::New(isolate, &SymlinkSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "truncateSync"),
+            v8::FunctionTemplate::New(isolate, &TruncateSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "unlinkSync"),
+            v8::FunctionTemplate::New(isolate, &UnlinkSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "utimesSync"),
+            v8::FunctionTemplate::New(isolate, &UtimesSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeFileSync"),
+            v8::FunctionTemplate::New(isolate, &WriteFileSync));
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writeSync"),
+            v8::FunctionTemplate::New(isolate, &WriteSync));
+
+
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "writevSync"),
+            v8::FunctionTemplate::New(isolate, &WritevSync));
 
 
     cache->FsTmpl =
@@ -425,7 +491,6 @@ void FSImpl::CopyFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 void FSImpl::CpSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
-    auto ctx = isolate->GetCurrentContext();
 
     args.GetReturnValue().SetUndefined();
 }
@@ -610,7 +675,6 @@ void FSImpl::MkdtempSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 }
 
-
 void FSImpl::ReadSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
@@ -787,22 +851,23 @@ void FSImpl::ReaddirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto result = fs_readdir_sync(path, options);
         auto size = result.size();
-        auto array = v8::Array::New(isolate, (int)size);
-        for(int32_t i = 0; i < size;i++){
+        auto array = v8::Array::New(isolate, (int) size);
+        for (int32_t i = 0; i < size; i++) {
             auto value = &result[i];
             auto type = fs_readdir_get_type(*value);
 
-            if(type == org::nativescript::nodecompat::ReaddirResultType::String){
+            if (type == org::nativescript::nodecompat::ReaddirResultType::String) {
                 auto string_value = fs_readdir_get_string_value(*value);
                 array->Set(ctx, i, Helpers::ConvertToV8String(isolate, string_value.c_str()));
-            }else {
+            } else {
                 auto buffer = fs_readdir_get_buffer_value(*value);
 
                 auto bufferImpl = new BufferImpl(std::move(buffer));
                 auto ext = v8::External::New(isolate, bufferImpl);
 
                 auto ctor = BufferImpl::GetCtor(isolate);
-                auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+                auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(
+                        ctx).ToLocalChecked();
                 ret->SetInternalField(0, ext);
                 array->Set(ctx, i, ret);
             }
@@ -817,8 +882,6 @@ void FSImpl::ReaddirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 }
 
-/*
-
 void FSImpl::ReadFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
@@ -830,22 +893,30 @@ void FSImpl::ReadFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    ReadFileOptions options{};
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    Helpers::ParseReadFileOptions(isolate, args[1], options);
 
     try {
-        auto ret = fs_read_file_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        auto ret = fs_read_file_sync(path, options);
+        bool is_buffer = fs_encoding_is_buffer(*ret);
+
+        if (!is_buffer) {
+            auto buffer = fs_encoding_get_buffer_value(*ret);
+            auto bufferImpl = new BufferImpl(std::move(buffer));
+            auto ext = v8::External::New(isolate, bufferImpl);
+
+            auto ctor = BufferImpl::GetCtor(isolate);
+            auto instance = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(
+                    ctx).ToLocalChecked();
+            instance->SetInternalField(0, ext);
+            args.GetReturnValue().Set(instance);
+        } else {
+            auto val = fs_encoding_get_string_value(*ret);
+            args.GetReturnValue().Set(Helpers::ConvertToV8String(isolate,
+                                                                 val.c_str()));
+        }
+
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -866,22 +937,31 @@ void FSImpl::ReadLinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    ReadLinkOptions options{};
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    Helpers::ParseReadLinkOptions(isolate, args[1], options);
 
     try {
-        auto ret = fs_read_link_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        auto ret = fs_read_link_sync(path, options);
+
+        bool is_buffer = fs_encoding_is_buffer(*ret);
+
+        if (!is_buffer) {
+            auto buffer = fs_encoding_get_buffer_value(*ret);
+            auto bufferImpl = new BufferImpl(std::move(buffer));
+            auto ext = v8::External::New(isolate, bufferImpl);
+
+            auto ctor = BufferImpl::GetCtor(isolate);
+            auto instance = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(
+                    ctx).ToLocalChecked();
+            instance->SetInternalField(0, ext);
+            args.GetReturnValue().Set(instance);
+        } else {
+            auto val = fs_encoding_get_string_value(*ret);
+            args.GetReturnValue().Set(Helpers::ConvertToV8String(isolate,
+                                                                 val.c_str()));
+        }
+
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -894,42 +974,83 @@ void FSImpl::ReadLinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void FSImpl::ReadvSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto pathValue = args[0];
+    auto fdValue = args[0];
 
-    std::string path;
+    int32_t fd = -1;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    if (fdValue->IsInt32()) {
+        fd = fdValue->Int32Value(ctx).ToChecked();
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
+    auto value = args[1];
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
+    int64_t position = -1;
+    auto positionValue = args[2];
+
+    if (positionValue->IsNumber()) {
+        position = (int64_t)positionValue->NumberValue(ctx).ToChecked();
     }
 
-    try {
-        auto ret = fs_readv_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+    std::vector<rust::Slice<uint8_t>> vec;
+
+    if (value->IsArray()) {
+        auto array = value.As<v8::Array>();
+        auto len = array->Length();
+        bool hasError = false;
+        vec.reserve(len);
+        for (int i = 0; i < len; i++) {
+            auto itemValue = array->Get(ctx, i);
+            if (itemValue.IsEmpty()) {
+                hasError = true;
+                break;
+            }
+            auto item = itemValue.ToLocalChecked();
+            if (item->IsArrayBufferView()) {
+                auto buffer = item.As<v8::ArrayBufferView>();
+                auto length = buffer->ByteLength();
+                auto arrayBuffer = buffer->Buffer();
+                auto offset = buffer->ByteOffset();
+                auto store = arrayBuffer->GetBackingStore();
+                auto data = static_cast<uint8_t *>(store->Data()) + offset;
+                rust::Slice<uint8_t> slice = rust::Slice(data, length);
+                vec.push_back(slice);
+            }
+
+        }
+        if (hasError) {
+            auto buffer = buffer_alloc(0);
+            auto bufferImpl = new BufferImpl(std::move(buffer));
+            auto ext = v8::External::New(isolate, bufferImpl);
+
+            auto ctor = GetCtor(isolate);
+            auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+            ret->SetInternalField(0, ext);
+            args.GetReturnValue().Set(ret);
+            return;
+        }
+
+
+        rust::Slice<const rust::Slice<uint8_t>> buffers(vec.data(), vec.size());
+        try {
+            auto ret = fs_readv_sync_slice(fd, buffers ,position);
+            args.GetReturnValue().Set((int32_t)ret);
+            return;
+        } catch (std::exception &error) {
+            auto err = v8::Exception::Error(
+                    Helpers::ConvertToV8String(isolate, error.what()));
+            isolate->ThrowException(err);
+        }
+
         return;
-    } catch (std::exception &error) {
-        auto err = v8::Exception::Error(
-                Helpers::ConvertToV8String(isolate, error.what()));
-        isolate->ThrowException(err);
     }
 
+    // todo throw
+    args.GetReturnValue().Set(0);
 }
 
 void FSImpl::RealpathSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
-    auto ctx = isolate->GetCurrentContext();
     auto pathValue = args[0];
 
     std::string path;
@@ -938,22 +1059,13 @@ void FSImpl::RealpathSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    RealPathOptions options{};
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    Helpers::ParseRealPathOptions(isolate, args[1], options);
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        auto ret = fs_real_path_sync(path, options);
+        args.GetReturnValue().Set(Helpers::ConvertToV8String(isolate, ret.c_str()));
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -983,7 +1095,7 @@ void FSImpl::RenameSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 
     try {
-       fs_rename_sync(oldPath, newPath);
+        fs_rename_sync(oldPath, newPath);
         args.GetReturnValue().SetUndefined();
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1004,23 +1116,13 @@ void FSImpl::RmdirSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    RmDirOptions options{};
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    Helpers::ParseRmDirOptions(isolate, args[1], options);
 
     try {
-        auto ret = fs_rmdir_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
-        return;
+        fs_rmdir_sync(path, options);
+        args.GetReturnValue().SetUndefined();
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
                 Helpers::ConvertToV8String(isolate, error.what()));
@@ -1036,27 +1138,13 @@ void FSImpl::RmSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
     std::string path;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
-    }
+    RmOptions options{};
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
-
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    Helpers::ParseRmOptions(isolate, args[1], options);
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
-        return;
+        fs_rm_sync(path, options);
+        args.GetReturnValue().SetUndefined();
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
                 Helpers::ConvertToV8String(isolate, error.what()));
@@ -1068,29 +1156,31 @@ void FSImpl::RmSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void FSImpl::StatfsSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto pathValue = args[0];
+    auto fdValue = args[0];
 
-    std::string path;
+    int32_t fd = -1;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    if (fdValue->IsInt32()) {
+        fd = fdValue->Int32Value(ctx).ToChecked();
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    bool bigint = false;
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
+    auto optionsValue = args[1];
+    if (optionsValue->IsObject()) {
+        auto options = optionsValue.As<v8::Object>();
+        v8::Local<v8::Value> bigintValue;
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
+        options->Get(ctx, Helpers::ConvertToV8String(isolate, "bigint")).ToLocal(&bigintValue);
+
+        if (bigintValue->IsBoolean()) {
+            bigint = bigintValue->BooleanValue(isolate);
+        }
     }
 
     try {
-        auto ret = fs_fstat_sync(path, flag, mode);
+        auto stat = fs_fstat_sync(fd);
+        auto ret = Helpers::FileStatToJS(isolate, bigint, stat);
         args.GetReturnValue().Set(ret);
         return;
     } catch (std::exception &error) {
@@ -1148,22 +1238,19 @@ void FSImpl::TruncateSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    uint64_t len = 0;
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
+    auto lenValue = args[1];
+    if(lenValue->IsNumber()){
+        auto value = lenValue->NumberValue(ctx).ToChecked();
+        if(value > -1){
+            len = (uint64_t)value;
+        }
     }
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        fs_truncate_sync(path, len);
+        args.GetReturnValue().SetUndefined();
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1184,22 +1271,9 @@ void FSImpl::UnlinkSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
-
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
-
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
-
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        fs_unlink_sync(path);
+        args.GetReturnValue().SetUndefined();
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1220,22 +1294,32 @@ void FSImpl::UtimesSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
         path = Helpers::ConvertFromV8String(isolate, pathValue);
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    int64_t atime = 0;
+    auto atimeValue = args[1];
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
+    if(atimeValue->IsNumber()){
+        atime = (int64_t)atimeValue->NumberValue(ctx).ToChecked();
+    }else if(atimeValue->IsDate()){
+        atime = (int64_t)atimeValue.As<v8::Date>()->ValueOf();
+    }else if(atimeValue->IsString()){
+        atime = (int64_t)std::stod(Helpers::ConvertFromV8String(isolate, atimeValue));
     }
-    int32_t mode = 438;
-    auto modeValue = args[2];
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
+    int64_t mtime = 0;
+    auto mtimeValue = args[1];
+
+    if(mtimeValue->IsNumber()){
+        mtime = (int64_t)mtimeValue->NumberValue(ctx).ToChecked();
+    }else if(mtimeValue->IsDate()){
+        mtime = (int64_t)mtimeValue.As<v8::Date>()->ValueOf();
+    }else if(mtimeValue->IsString()){
+        mtime = (int64_t)std::stod(Helpers::ConvertFromV8String(isolate, mtimeValue));
     }
+
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        fs_utimes_sync(path,atime , mtime);
+        args.GetReturnValue().SetUndefined();
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1248,30 +1332,51 @@ void FSImpl::UtimesSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void FSImpl::WriteFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto pathValue = args[0];
+    auto pathOrFdValue = args[0];
 
     std::string path;
+    int32_t fd = -1;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    if (pathOrFdValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathOrFdValue);
+    }else if (pathOrFdValue->IsInt32()){
+        fd = pathOrFdValue->Int32Value(ctx).ToChecked();
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
+    auto dataValue = args[1];
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    WriteFileOptions options{};
+
+    Helpers::ParseWriteFileOptions(isolate, args[2], options);
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        if(fd != -1){
+            if(dataValue->IsString()){
+                fs_write_file_with_str_sync(fd, Helpers::ConvertFromV8String(isolate, dataValue), options);
+            }else if(dataValue->IsTypedArray()){
+                auto array = dataValue.As<v8::TypedArray>();
+                auto buffer = array->Buffer();
+                auto store = buffer->GetBackingStore();
+                auto os = array->ByteOffset();
+                auto len = array->ByteLength();
+                auto data = static_cast<uint8_t *>(store->Data()) + os;
+                fs_write_file_with_bytes_sync(fd, rust::Slice<const uint8_t>(data, len), options);
+            }
+        }else {
+            if(dataValue->IsString()){
+                fs_write_file_with_str_from_path_sync(path, Helpers::ConvertFromV8String(isolate, dataValue), options);
+            }else if(dataValue->IsTypedArray()){
+                auto array = dataValue.As<v8::TypedArray>();
+                auto buffer = array->Buffer();
+                auto store = buffer->GetBackingStore();
+                auto os = array->ByteOffset();
+                auto len = array->ByteLength();
+                auto data = static_cast<uint8_t *>(store->Data()) + os;
+                fs_write_file_with_bytes_from_path_sync(path, rust::Slice<const uint8_t>(data, len), options);
+            }
+        }
+        args.GetReturnValue().SetUndefined();
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1284,30 +1389,47 @@ void FSImpl::WriteFileSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void FSImpl::WriteSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto pathValue = args[0];
+    auto fdValue = args[0];
 
-    std::string path;
+    int32_t fd = -1;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    if (fdValue->IsInt32()) {
+        fd = fdValue->Int32Value(ctx).ToChecked();
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    auto bufferValue = args[1];
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
+    WriteOptions options{};
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
+    v8::Local<v8::Value> offsetValue = args[2];
+
+    if (offsetValue->IsNumber()) {
+        options.offset = (size_t)offsetValue->NumberValue(ctx).ToChecked();
     }
+
+    v8::Local<v8::Value> lengthValue = args[3];
+
+    if (lengthValue->IsNumber()) {
+        options.length = (size_t)lengthValue->NumberValue(ctx).ToChecked();
+    }
+
+    v8::Local<v8::Value> positionValue = args[4];
+
+    if (positionValue->IsNumber()) {
+        options.position = (rust::isize)positionValue->NumberValue(ctx).ToChecked();
+    }
+
 
     try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+
+        auto array = bufferValue.As<v8::TypedArray>();
+        auto buffer = array->Buffer();
+        auto store = buffer->GetBackingStore();
+        auto os = array->ByteOffset();
+        auto len = array->ByteLength();
+        auto data = static_cast<uint8_t *>(store->Data()) + os;
+        auto ret = fs_write_sync(fd, rust::Slice<const uint8_t>(data, len), options);
+        args.GetReturnValue().Set((int32_t)ret);
         return;
     } catch (std::exception &error) {
         auto err = v8::Exception::Error(
@@ -1320,36 +1442,74 @@ void FSImpl::WriteSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void FSImpl::WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
-    auto pathValue = args[0];
+    auto fdValue = args[0];
 
-    std::string path;
+    int32_t fd = -1;
 
-    if (pathValue->IsString()) {
-        path = Helpers::ConvertFromV8String(isolate, pathValue);
+
+    int64_t position = -1;
+    auto positionValue = args[2];
+
+    if (positionValue->IsNumber()) {
+        position = (int64_t)positionValue->NumberValue(ctx).ToChecked();
     }
 
-    auto flagValue = args[1];
-    int32_t flag = O_RDONLY;
+    std::vector<rust::Slice<const uint8_t>> vec;
 
-    if (flagValue->IsInt32()) {
-        flag = flagValue->Int32Value(ctx).ToChecked();
-    }
-    int32_t mode = 438;
-    auto modeValue = args[2];
+    auto value = args[1];
 
-    if (modeValue->IsInt32()) {
-        mode = modeValue->Int32Value(ctx).ToChecked();
-    }
+    if (value->IsArray()) {
+        auto array = value.As<v8::Array>();
+        auto len = array->Length();
+        bool hasError = false;
+        vec.reserve(len);
+        for (int i = 0; i < len; i++) {
+            auto itemValue = array->Get(ctx, i);
+            if (itemValue.IsEmpty()) {
+                hasError = true;
+                break;
+            }
+            auto item = itemValue.ToLocalChecked();
+            if (item->IsArrayBufferView()) {
+                auto buffer = item.As<v8::ArrayBufferView>();
+                auto length = buffer->ByteLength();
+                auto arrayBuffer = buffer->Buffer();
+                auto offset = buffer->ByteOffset();
+                auto store = arrayBuffer->GetBackingStore();
+                auto data = static_cast<uint8_t *>(store->Data()) + offset;
+                rust::Slice<const uint8_t> slice(data, length);
+                vec.push_back(slice);
+            }
 
-    try {
-        auto ret = fs_real_path_sync(path, flag, mode);
-        args.GetReturnValue().Set(ret);
+        }
+        if (hasError) {
+            auto buffer = buffer_alloc(0);
+            auto bufferImpl = new BufferImpl(std::move(buffer));
+            auto ext = v8::External::New(isolate, bufferImpl);
+
+            auto ctor = GetCtor(isolate);
+            auto ret = ctor->GetFunction(ctx).ToLocalChecked()->NewInstance(ctx).ToLocalChecked();
+            ret->SetInternalField(0, ext);
+            args.GetReturnValue().Set(ret);
+            return;
+        }
+
+
+        rust::Slice<const rust::Slice<const uint8_t>> buffers(vec.data(), vec.size());
+        try {
+            auto ret = fs_writev_sync_slice(fd, buffers ,position);
+            args.GetReturnValue().Set((int32_t)ret);
+            return;
+        } catch (std::exception &error) {
+            auto err = v8::Exception::Error(
+                    Helpers::ConvertToV8String(isolate, error.what()));
+            isolate->ThrowException(err);
+        }
+
         return;
-    } catch (std::exception &error) {
-        auto err = v8::Exception::Error(
-                Helpers::ConvertToV8String(isolate, error.what()));
-        isolate->ThrowException(err);
     }
+
+
+    args.GetReturnValue().Set(0);
 
 }
-*/
