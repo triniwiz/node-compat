@@ -105,6 +105,7 @@ add_library(
         src/main/cpp/FSImpl.cpp
         src/main/cpp/FileDirImpl.cpp
         src/main/cpp/FileDirentImpl.cpp
+        src/main/cpp/FileHandleImpl.cpp
 
         ${NODE_ANDROID_BRIDGE_CPP}
 )

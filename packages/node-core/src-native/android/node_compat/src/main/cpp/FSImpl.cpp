@@ -202,6 +202,9 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "writevSync"),
             v8::FunctionTemplate::New(isolate, &WritevSync));
 
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "open"),
+            v8::FunctionTemplate::New(isolate, &Open));
 
     cache->FsTmpl =
             std::make_unique<v8::Persistent<v8::FunctionTemplate>>(isolate, ctorTmpl);
@@ -1511,5 +1514,38 @@ void FSImpl::WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 
     args.GetReturnValue().Set(0);
+
+}
+
+
+void FSImpl::Open(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    auto success = [](int32_t fd){
+        Helpers::LogToConsole("fd success");
+    };
+    auto error = [](){};
+    auto callback = fs_async_create_async_i32_closure(&success, &error);
+    fs_async_open(path, flag, mode, *callback);
 
 }
