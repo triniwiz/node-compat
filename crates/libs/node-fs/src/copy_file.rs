@@ -47,8 +47,7 @@ pub fn copy_file(from: &Path, to: &Path, mode: c_uint) -> io::Result<()> {
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub fn copy_file(from: &Path, to: &Path, flags: c_uint) -> io::Result<()> {
-    use crate::common::FILE_COPY_OPTIONS_COPYFILE_FICLONE_FORCE;
-    use crate::common::{FILE_COPY_OPTIONS_COPYFILE_EXCL, FILE_COPY_OPTIONS_COPYFILE_FICLONE};
+    use crate::constants::{FILE_COPY_OPTIONS_COPYFILE_EXCL, FILE_COPY_OPTIONS_COPYFILE_FICLONE};
     use std::ffi::c_void;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
