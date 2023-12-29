@@ -1,16 +1,13 @@
 use std::borrow::Cow;
-use std::ffi::{c_char, CStr, CString, NulError};
-use std::fmt::{Display, Formatter};
+use std::ffi::{c_char, CStr, CString};
+use std::fmt::Display;
 use std::os::fd::RawFd;
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_void};
 use std::sync::Arc;
 use node_fs::prelude::{handle_meta};
 use node_core::error::{get_custom_error_message, Result};
 
-pub use node_fs::file_stat::FileStat;
-pub use node_fs::prelude::FsEncodingType;
-pub use node_buffer::StringEncoding;
-
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct WriteFileOptions {
     encoding: StringEncoding,
@@ -18,6 +15,7 @@ pub struct WriteFileOptions {
     flag: i32,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct WriteOptions {
     offset: usize,
@@ -25,6 +23,7 @@ pub struct WriteOptions {
     position: isize,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct RmOptions {
     force: bool,
@@ -33,6 +32,7 @@ pub struct RmOptions {
     retry_delay: u64,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct RmDirOptions {
     max_retries: i32,
@@ -40,22 +40,26 @@ pub struct RmDirOptions {
     retry_delay: u64,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct RealPathOptions {
     encoding: StringEncoding,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ReadLinkOptions {
     encoding: FsEncodingType,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ReadFileOptions {
     flag: i32,
     encoding: FsEncodingType,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct ReaddirOptions {
     with_file_types: bool,
@@ -63,6 +67,7 @@ pub struct ReaddirOptions {
     recursive: bool,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct OpenDirOptions {
     encoding: StringEncoding,
@@ -70,17 +75,20 @@ pub struct OpenDirOptions {
     recursive: bool,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct MkdTempOptions {
     encoding: StringEncoding,
 }
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct MkDirOptions {
     mode: u32,
     recursive: bool,
 }
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct AppendFileOptions {
     encoding: StringEncoding,
@@ -88,12 +96,68 @@ pub struct AppendFileOptions {
     flag: i32,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum StringEncoding {
+    StringEncodingAscii,
+    StringEncodingUtf8,
+    StringEncodingUtf16le,
+    StringEncodingUcs2,
+    StringEncodingBase64,
+    StringEncodingBase64Url,
+    StringEncodingLatin1,
+    StringEncodingBinary,
+    StringEncodingHex,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum FsEncodingType {
+    FsEncodingTypeAscii,
+    FsEncodingTypeUtf8,
+    FsEncodingTypeUtf16le,
+    FsEncodingTypeUcs2,
+    FsEncodingTypeLatin1,
+    FsEncodingTypeBuffer,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum ReaddirResultType {
     String,
     Buffer,
     Type,
+}
+
+
+#[repr(C)]
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Copy)]
+pub struct FileStat {
+    pub dev: i64,
+    pub ino: i64,
+    pub mode: i32,
+    pub nlink: i64,
+    pub uid: i32,
+    pub gid: i32,
+    pub rdev: i64,
+    pub size: i64,
+    pub blksize: i64,
+    pub blocks: i64,
+    pub atimeMs: f64,
+    pub mtimeMs: f64,
+    pub ctimeMs: f64,
+    pub birthtimeMs: f64,
+    pub birthtime: f64,
+    pub atime: f64,
+    pub mtime: f64,
+    pub ctime: f64,
+    pub isBlockDevice: bool,
+    pub isCharacterDevice: bool,
+    pub isDirectory: bool,
+    pub isFIFO: bool,
+    pub isFile: bool,
+    pub isSocket: bool,
+    pub isSymbolicLink: bool,
 }
 
 
@@ -123,7 +187,7 @@ impl Error {
     }
 
     pub fn message(&self) -> Cow<str> {
-        node_core::error::get_custom_error_message(&self.0).unwrap_or_default()
+        get_custom_error_message(&self.0).unwrap_or_default()
     }
 }
 
@@ -255,7 +319,7 @@ pub extern "C" fn buffer_concat_length(buffers: *const *const u8, buffers_length
 
 #[no_mangle]
 pub extern "C" fn buffer_from_string(string: *const c_char, encoding: StringEncoding) -> *mut Buffer {
-    let string = unsafe { std::ffi::CStr::from_ptr(string) };
+    let string = unsafe { CStr::from_ptr(string) };
     Box::into_raw(
         Buffer(
             node_buffer::Buffer::from_str(string, encoding.into())
@@ -1058,6 +1122,10 @@ pub extern "C" fn fs_access_sync(path: *const c_char, mode: i32) {
 
 #[no_mangle]
 pub extern "C" fn fs_append_file_sync(fd: i32, buffer: *const Buffer, options: AppendFileOptions) {
+    if buffer.is_null() {
+        return;
+    }
+    let buffer = unsafe { &*buffer };
     if let Err(err) = node_fs::sync::append_file_with_buffer(fd, &buffer.0, options.into())
         .map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
@@ -1065,44 +1133,82 @@ pub extern "C" fn fs_append_file_sync(fd: i32, buffer: *const Buffer, options: A
 }
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_bytes_sync(fd: i32, bytes: &[u8], options: AppendFileOptions) {
+pub extern "C" fn fs_append_file_with_bytes_sync(fd: i32, bytes: *const u8, length: usize, options: AppendFileOptions) {
+    if bytes.is_null() || length == 0 {
+        return;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(bytes, length) };
     if let Err(err) = node_fs::sync::append_file_with_bytes(fd, bytes, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_string_sync(fd: i32, string: &str, options: AppendFileOptions) {
-    if let Err(err) = node_fs::sync::append_file_with_str(fd, string, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_append_file_with_string_sync(fd: i32, string: *const c_char, options: AppendFileOptions) {
+    if string.is_null() {
+        return;
+    }
+
+    let string = unsafe { CStr::from_ptr(string) };
+    let string = string.to_string_lossy();
+    if let Err(err) = node_fs::sync::append_file_with_str(fd, string.as_ref(), options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_path_sync(path: &str, buffer: *const Buffer, options: AppendFileOptions) {
-    if let Err(err) = node_fs::sync::append_file_with_path_buffer(path, &buffer.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_append_file_with_path_sync(path: *const c_char, buffer: *const Buffer, options: AppendFileOptions) {
+    if buffer.is_null() || path.is_null() {
+        return;
+    }
+    let buffer = unsafe { &*buffer };
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::append_file_with_path_buffer(path.as_ref(), &buffer.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_path_bytes_sync(path: &str, bytes: &[u8], options: AppendFileOptions) {
-    if let Err(err) = node_fs::sync::append_file_with_path_bytes(path, bytes, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_append_file_with_path_bytes_sync(path: *const c_char, bytes: *const u8, length: usize, options: AppendFileOptions) {
+    if bytes.is_null() || length == 0 || path.is_null() {
+        return;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(bytes, length) };
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::append_file_with_path_bytes(path.as_ref(), bytes, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_path_buffer_sync(path: &str, buffer: *const Buffer, options: AppendFileOptions) {
-    if let Err(err) = node_fs::sync::append_file_with_path_buffer(path, &buffer.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_append_file_with_path_buffer_sync(path: *const c_char, buffer: *const Buffer, options: AppendFileOptions) {
+    if buffer.is_null() || path.is_null() {
+        return;
+    }
+    let buffer = unsafe { &*buffer };
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+    if let Err(err) = node_fs::sync::append_file_with_path_buffer(path.as_ref(), &buffer.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 
 #[no_mangle]
-pub extern "C" fn fs_append_file_with_path_string_sync(path: &str, string: &str, options: AppendFileOptions) {
-    if let Err(err) = node_fs::sync::append_file_with_path_str(path, string, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_append_file_with_path_string_sync(path: *const c_char, string: *const c_char, options: AppendFileOptions) {
+    if path.is_null() || string.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let string = unsafe { CStr::from_ptr(string) };
+    let string = string.to_string_lossy();
+    if let Err(err) = node_fs::sync::append_file_with_path_str(path.as_ref(), string.as_ref(), options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
@@ -1113,6 +1219,12 @@ pub extern "C" fn fs_append_file_with_buffer_buffer_sync(
     data: *const Buffer,
     options: AppendFileOptions,
 ) {
+    if dest.is_null() || data.is_null() {
+        return;
+    }
+    let dest = unsafe { &mut *dest };
+    let data = unsafe { &*data };
+
     if let Err(err) = node_fs::sync::append_file_with_buffer_buffer(&mut dest.0, &data.0, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
@@ -1125,22 +1237,40 @@ pub extern "C" fn fs_append_file_with_buffer_string_sync(
     data: *const c_char,
     options: AppendFileOptions,
 ) {
-    if let Err(err) = node_fs::sync::append_file_with_buffer_string(&mut dest.0, data, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+    if dest.is_null() || data.is_null() {
+        return;
+    }
+    let dest = unsafe { &mut *dest };
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::append_file_with_buffer_string(&mut dest.0, data.as_ref(), options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 
 #[no_mangle]
-pub extern "C" fn fs_chmod_sync(path: &str, mode: u32) {
-    if let Err(err) = node_fs::sync::chmod(path, mode).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_chmod_sync(path: *const c_char, mode: u32) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+    if let Err(err) = node_fs::sync::chmod(path.as_ref(), mode).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_chown_sync(path: &str, uid: u32, gid: u32) {
-    if let Err(err) = node_fs::sync::chown(path, uid, gid).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_chown_sync(path: *const c_char, uid: u32, gid: u32) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::chown(path.as_ref(), uid, gid).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
@@ -1151,20 +1281,47 @@ pub extern "C" fn fs_close_sync(fd: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_copy_file_sync(src: &str, dest: &str, flags: u32) {
-    if let Err(err) = node_fs::sync::copy_file(src, dest, flags).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_copy_file_sync(src: *const c_char, dest: *const c_char, flags: u32) {
+    if src.is_null() || dest.is_null() {
+        return;
+    }
+    let src = unsafe { CStr::from_ptr(src) };
+    let src = src.to_string_lossy();
+
+
+    let dest = unsafe { CStr::from_ptr(dest) };
+    let dest = dest.to_string_lossy();
+
+
+    if let Err(err) = node_fs::sync::copy_file(src.as_ref(), dest.as_ref(), flags).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_cp_sync(src: &str, dest: &str, flags: u32) {
-    node_fs::sync::cp(src, dest, flags);
+pub extern "C" fn fs_cp_sync(src: *const c_char, dest: *const c_char, flags: u32) {
+    if src.is_null() || dest.is_null() {
+        return;
+    }
+    let src = unsafe { CStr::from_ptr(src) };
+    let src = src.to_string_lossy();
+
+
+    let dest = unsafe { CStr::from_ptr(dest) };
+    let dest = dest.to_string_lossy();
+
+    node_fs::sync::cp(src.as_ref(), dest.as_ref(), flags);
 }
 
 #[no_mangle]
-pub extern "C" fn fs_exists_sync(src: &str) -> bool {
-    node_fs::sync::exists(src)
+pub extern "C" fn fs_exists_sync(src: *const c_char) -> bool {
+    if src.is_null() {
+        return false;
+    }
+    let src = unsafe { CStr::from_ptr(src) };
+    let src = src.to_string_lossy();
+
+    node_fs::sync::exists(src.as_ref())
 }
 
 #[no_mangle]
@@ -1196,7 +1353,7 @@ pub extern "C" fn fs_fstat_sync(fd: i32) -> *mut FileStat {
         .map_err(|e| node_core::error::error_from_io_error(e)) {
         Ok(stat) => {
             Box::into_raw(
-                Box::new(stat)
+                Box::new(FileStat::from(stat))
             )
         }
         Err(err) => {
@@ -1228,43 +1385,76 @@ pub extern "C" fn fs_futimes_sync(fd: i32, atime: usize, mtime: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_lchmod_sync(path: &str, mode: u32) {
-    if let Err(err) = node_fs::sync::chmod(path, mode).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_lchmod_sync(path: *const c_char, mode: u32) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::chmod(path.as_ref(), mode).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_lchown_sync(path: &str, uid: u32, gid: u32) {
-    if let Err(err) = node_fs::sync::chown(path, uid, gid).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_lchown_sync(path: *const c_char, uid: u32, gid: u32) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::chown(path.as_ref(), uid, gid).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_lutimes_sync(path: &str, atime: i64, mtime: i64) {
-    if let Err(err) = node_fs::sync::lutimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_lutimes_sync(path: *const c_char, atime: i64, mtime: i64) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::lutimes(path.as_ref(), atime.try_into().unwrap(), mtime.try_into().unwrap()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_link_sync(existing_path: &str, new_path: &str) {
-    if let Err(err) = node_fs::sync::link(existing_path, new_path).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_link_sync(existing_path: *const c_char, new_path: *const c_char) {
+    if existing_path.is_null() || new_path.is_null() {
+        return;
+    }
+    let existing_path = unsafe { CStr::from_ptr(existing_path) };
+    let existing_path = existing_path.to_string_lossy();
+
+    let new_path = unsafe { CStr::from_ptr(new_path) };
+    let new_path = new_path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::link(existing_path.as_ref(), new_path.as_ref()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_lstat_sync(path: &str) -> *mut FileStat {
-    match node_fs::sync::lstat(path)
+pub extern "C" fn fs_lstat_sync(path: *const c_char) -> *mut FileStat {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::lstat(path.as_ref())
         .map(|metadata| {
             handle_meta(&metadata)
         })
         .map_err(|e| node_core::error::error_from_io_error(e)) {
         Ok(stat) => {
             Box::into_raw(
-                Box::new(stat)
+                Box::new(FileStat::from(stat))
             )
         }
         Err(err) => {
@@ -1275,15 +1465,27 @@ pub extern "C" fn fs_lstat_sync(path: &str) -> *mut FileStat {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_mkdir_sync(path: &str, options: MkDirOptions) {
-    if let Err(err) = node_fs::sync::mkdir(path, options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
+pub extern "C" fn fs_mkdir_sync(path: *const c_char, options: MkDirOptions) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::mkdir(path.as_ref(), options.into()).map_err(|e| node_core::error::error_from_io_error(e)) {
         update_last_error(err);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_mkdtemp_sync(prefix: &str, options: MkdTempOptions) -> *const c_char {
-    match node_fs::sync::mkdtemp(prefix, options.into())
+pub extern "C" fn fs_mkdtemp_sync(prefix: *const c_char, options: MkdTempOptions) -> *const c_char {
+    if prefix.is_null() {
+        return std::ptr::null();
+    }
+    let prefix = unsafe { CStr::from_ptr(prefix) };
+    let prefix = prefix.to_string_lossy();
+
+    match node_fs::sync::mkdtemp(prefix.as_ref(), options.into())
         .map(|path| path.to_string_lossy().to_string())
         .map_err(|e| node_core::error::error_from_io_error(e)) {
         Ok(path) => {
@@ -1297,8 +1499,14 @@ pub extern "C" fn fs_mkdtemp_sync(prefix: &str, options: MkdTempOptions) -> *con
 }
 
 #[no_mangle]
-pub extern "C" fn fs_open_sync(path: &str, flag: i32, mode: i32) -> c_int {
-    match node_fs::sync::open(path, flag, mode)
+pub extern "C" fn fs_open_sync(path: *const c_char, flag: i32, mode: i32) -> c_int {
+    if path.is_null() {
+        return 0;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::open(path.as_ref(), flag, mode)
         .map_err(|e| node_core::error::error_from_io_error(e)) {
         Ok(fd) => fd,
         Err(err) => {
@@ -1309,8 +1517,13 @@ pub extern "C" fn fs_open_sync(path: &str, flag: i32, mode: i32) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_opendir_sync(path: &str, options: OpenDirOptions) -> *mut FileDir {
-    match node_fs::sync::opendir(path, options.into())
+pub extern "C" fn fs_opendir_sync(path: *const c_char, options: OpenDirOptions) -> *mut FileDir {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+    match node_fs::sync::opendir(path.as_ref(), options.into())
         .map(|dir| {
             Box::new(FileDir(dir))
         })
@@ -1328,11 +1541,13 @@ pub extern "C" fn fs_opendir_sync(path: &str, options: OpenDirOptions) -> *mut F
 #[no_mangle]
 pub extern "C" fn fs_read_sync(
     fd: i32,
-    buffer: &mut [u8],
+    buffer: *mut u8,
+    buffer_length: usize,
     offset: usize,
     length: usize,
     position: isize,
 ) -> usize {
+    let buffer = unsafe { std::slice::from_raw_parts_mut(buffer, buffer_length) };
     node_fs::sync::read(fd, buffer, offset, length, position).map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
         update_last_error(err);
         0
@@ -1343,12 +1558,14 @@ pub extern "C" fn fs_read_sync(
 #[no_mangle]
 pub extern "C" fn fs_read_sync(
     fd: i64,
-    buffer: &mut [u8],
+    buffer: *mut u8,
+    buffer_length: usize,
     offset: usize,
     length: usize,
     position: isize,
 ) -> usize {
     unsafe {
+        let buffer = std::slice::from_raw_parts_mut(buffer, buffer_length);
         let fd = fd as *mut std::ffi::c_void;
         node_fs::sync::read(fd, buffer, offset, length, position).map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
             update_last_error(err);
@@ -1358,8 +1575,15 @@ pub extern "C" fn fs_read_sync(
 }
 
 
+/*
 #[no_mangle]
-pub extern "C" fn fs_readdir_sync(path: &str, options: ReaddirOptions) -> Result<Vec<ReaddirResult>> {
+pub extern "C" fn fs_readdir_sync(path: *const c_char, options: ReaddirOptions) -> Result<Vec<ReaddirResult>> {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
     node_fs::sync::readdir(path, options.into())
         .map(|mut value| {
             value.into_iter()
@@ -1368,6 +1592,8 @@ pub extern "C" fn fs_readdir_sync(path: &str, options: ReaddirOptions) -> Result
         })
         .map_err(|e| node_core::error::error_from_io_error(e))
 }
+
+*/
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct FsEncoding(node_fs::FsEncoding);
@@ -1399,198 +1625,422 @@ impl FsEncoding {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_read_file_sync(path: &str, options: ReadFileOptions) -> Result<Box<FsEncoding>> {
-    node_fs::sync::read_file(path, options.into())
+pub extern "C" fn fs_read_file_sync(path: *const c_char, options: ReadFileOptions) -> *mut FsEncoding {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::read_file(path.as_ref(), options.into())
         .map(|f| Box::new(FsEncoding(f)))
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(encoding) => Box::into_raw(encoding),
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_read_file_with_fd_sync(fd: i32, options: ReadFileOptions) -> Result<Box<FsEncoding>> {
-    node_fs::sync::read_file_with_fd(fd, options.into())
+pub extern "C" fn fs_read_file_with_fd_sync(fd: i32, options: ReadFileOptions) -> *mut FsEncoding {
+    match node_fs::sync::read_file_with_fd(fd, options.into())
         .map(|f| Box::new(FsEncoding(f)))
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(encoding) => Box::into_raw(encoding),
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_read_link_sync(path: &str, options: ReadLinkOptions) -> Result<Box<FsEncoding>> {
-    node_fs::sync::read_link(path, options.into())
+pub extern "C" fn fs_read_link_sync(path: *const c_char, options: ReadLinkOptions) -> *mut FsEncoding {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::read_link(path.as_ref(), options.into())
         .map(|f| Box::new(FsEncoding(f)))
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(encoding) => Box::into_raw(encoding),
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_readv_sync(fd: i32, buffers: &mut [Buffer], position: i64) -> Result<usize> {
-    let mut buffers = buffers.iter().map(|buffer| buffer.0.clone())
-        .collect::<Vec<node_buffer::Buffer>>();
-    node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
-        .map_err(|e| node_core::error::error_from_io_error(e))
-}
+pub extern "C" fn fs_readv_sync(fd: i32, buffers: *mut *mut Buffer, length: usize, position: i64) -> usize {
+    let buffers = unsafe { std::slice::from_raw_parts_mut(buffers, length) };
 
-#[no_mangle]
-pub extern "C" fn fs_readv_sync_slice(fd: i32, buffers: &[&mut [u8]], position: i64) -> Result<usize> {
     let mut buffers = buffers.iter().map(|buffer| {
-        unsafe { node_buffer::Buffer::from_reference((*buffer).as_ptr() as *mut _, buffer.len()) }
+        let buffer = unsafe { &mut **buffer };
+        buffer.0.clone()
     })
         .collect::<Vec<node_buffer::Buffer>>();
+
     node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
 }
 
 #[no_mangle]
-pub extern "C" fn fs_real_path_sync(path: &str, options: ffi::RealPathOptions) -> Result<String> {
-    node_fs::sync::real_path(path, options.into())
+pub extern "C" fn fs_readv_sync_slice(fd: i32, buffers: *const *mut u8, length: usize, buffers_buffers: *const usize, buffers_buffers_length: usize, position: i64) -> usize {
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, buffers_buffers_length) };
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+    let mut buffers = buffers.iter().zip(buffer_length.iter())
+        .map(|(buffer, len)| {
+            unsafe { node_buffer::Buffer::from_reference(*buffer, *len) }
+        }).collect::<Vec<node_buffer::Buffer>>();
+
+    node_fs::sync::readv(fd, buffers.as_mut_slice(), position.try_into().unwrap())
+        .map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn fs_real_path_sync(path: *const c_char, options: RealPathOptions) -> *const c_char {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::real_path(path.as_ref(), options.into())
         .map(|v| v.to_string_lossy().to_string())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(path) => CString::new(path).unwrap().into_raw(),
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null()
+        }
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_rename_sync(old_path: &str, new_path: &str) {
-    node_fs::sync::rename(old_path, new_path)
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_rename_sync(old_path: *const c_char, new_path: *const c_char) {
+    if old_path.is_null() || new_path.is_null() {
+        return;
+    }
+    let old_path = unsafe { CStr::from_ptr(old_path) };
+    let old_path = old_path.to_string_lossy();
+
+    let new_path = unsafe { CStr::from_ptr(new_path) };
+    let new_path = new_path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::rename(old_path.as_ref(), new_path.as_ref())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_rmdir_sync(
-    path: &str,
+    path: *const c_char,
     options: RmDirOptions,
 ) {
-    node_fs::sync::rmdir(path, options.into())
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::rmdir(path.as_ref(), options.into()) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_rm_sync(
-    path: &str,
+    path: *const c_char,
     options: RmOptions,
 ) {
-    node_fs::sync::rm(path, options.into())
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::rm(path.as_ref(), options.into()) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_stat_sync(path: &str) -> Result<FileStat> {
-    node_fs::sync::stat(path)
+pub extern "C" fn fs_stat_sync(path: *const c_char) -> *mut FileStat {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    match node_fs::sync::stat(path.as_ref())
         .map(|metadata| {
-            unsafe { std::mem::transmute(handle_meta(&metadata)) }
+            handle_meta(&metadata)
         })
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(stat) => Box::into_raw(Box::new(FileStat::from(stat))),
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_symlink_sync(target: &str, path: &str, _type_: &str) {
-    node_fs::sync::symlink(target, path, _type_)
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_symlink_sync(target: *const c_char, path: *const c_char, _type_: *const c_char) {
+    if target.is_null() || path.is_null() || _type_.is_null() {
+        return;
+    }
+
+    let target = unsafe { CStr::from_ptr(target) };
+    let target = target.to_string_lossy();
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let _type_ = unsafe { CStr::from_ptr(_type_) };
+    let _type_ = _type_.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::symlink(target.as_ref(), path.as_ref(), _type_.as_ref())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_truncate_sync(path: &str, len: u64) {
-    node_fs::sync::truncate(path, len.try_into().unwrap())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_truncate_sync(path: *const c_char, len: u64) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::truncate(path.as_ref(), len.try_into().unwrap())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_unlink_sync(path: &str) {
-    node_fs::sync::unlink(path)
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_unlink_sync(path: *const c_char) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::unlink(path.as_ref())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_utimes_sync(path: &str, atime: i64, mtime: i64) {
-    node_fs::sync::utimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_utimes_sync(path: *const c_char, atime: i64, mtime: i64) {
+    if path.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::utimes(path.as_ref(), atime.try_into().unwrap(), mtime.try_into().unwrap())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_write_sync(
     fd: i32,
-    buffer: &[u8],
-    options: ffi::WriteOptions,
-) -> Result<usize> {
+    buffer: *const u8,
+    length: usize,
+    options: WriteOptions,
+) -> usize {
+    let buffer = unsafe { std::slice::from_raw_parts(buffer, length) };
     node_fs::sync::write(fd, buffer, options.into())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn fs_write_string_sync(
     fd: i32,
-    string: &str,
-    encoding: ffi::StringEncoding,
+    string: *const c_char,
+    encoding: StringEncoding,
     position: isize,
-) -> Result<usize> {
+) -> usize {
+    if string.is_null() {
+        return 0;
+    }
+    let string = unsafe { CStr::from_ptr(string) };
+    let string = string.to_string_lossy();
+
     node_fs::sync::write_string(
-        fd, string, encoding.into(), position,
-    ).map_err(|e| node_core::error::error_from_io_error(e))
+        fd, string.as_ref(), encoding.into(), position,
+    ).map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
 }
 
 #[no_mangle]
-pub extern "C" fn fs_write_file_with_str_sync(fd: i32, data: &str, options: WriteFileOptions) {
-    node_fs::sync::write_file_with_str(fd, data, options.into())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_write_file_with_str_sync(fd: i32, data: *const c_char, options: WriteFileOptions) {
+    if data.is_null() {
+        return;
+    }
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::write_file_with_str(fd, data.as_ref(), options.into())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_write_file_with_bytes_sync(fd: i32, data: &[u8], options: WriteFileOptions) {
-    node_fs::sync::write_file_with_bytes(fd, data, options.into())
-        .map_err(|e| node_core::error::error_from_io_error(e))
+pub extern "C" fn fs_write_file_with_bytes_sync(fd: i32, data: *const u8, length: usize, options: WriteFileOptions) {
+    if data.is_null() || length == 0 {
+        return;
+    }
+    let data = unsafe { std::slice::from_raw_parts(data, length) };
+    if let Err(err) = node_fs::sync::write_file_with_bytes(fd, data, options.into())
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_write_file_with_str_from_path_sync(
-    path: &str,
-    data: &str,
+    path: *const c_char,
+    data: *const c_char,
     options: WriteFileOptions,
 ) {
-    node_fs::sync::write_file_with_str_from_path(
-        path, data, options.into(),
+    if path.is_null() || data.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    if let Err(err) = node_fs::sync::write_file_with_str_from_path(
+        path.as_ref(), data.as_ref(), options.into(),
     )
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_write_file_with_bytes_from_path_sync(
-    path: &str,
-    data: &[u8],
-    options: ffi::WriteFileOptions,
+    path: *const c_char,
+    data: *const u8,
+    length: usize,
+    options: WriteFileOptions,
 ) {
-    node_fs::sync::write_file_with_bytes_from_path(
-        path, data, options.into(),
+    if path.is_null() || data.is_null() || length == 0 {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { std::slice::from_raw_parts(data, length) };
+
+    if let Err(err) = node_fs::sync::write_file_with_bytes_from_path(
+        path.as_ref(), data, options.into(),
     )
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn fs_write_file_with_buffer_from_path_sync(
-    path: &str,
-    data: &Buffer,
-    options: ffi::WriteFileOptions,
+    path: *const c_char,
+    data: *const Buffer,
+    options: WriteFileOptions,
 ) {
-    node_fs::sync::write_file_with_buffer_from_path(
-        path, &data.0, options.into(),
+    if path.is_null() || data.is_null() {
+        return;
+    }
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { &*data };
+
+    if let Err(err) = node_fs::sync::write_file_with_buffer_from_path(
+        path.as_ref(), &data.0, options.into(),
     )
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        update_last_error(err);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn fs_writev_sync(fd: i32, mut buffers: Vec<Buffer>, position: i64) -> Result<usize> {
-    let buffers = buffers.iter().map(|buffer| buffer.0.clone()).collect::<Vec<node_buffer::Buffer>>();
+pub extern "C" fn fs_writev_sync(fd: i32, buffers: *mut *mut Buffer, length: usize, position: i64) -> usize {
+    let buffers = unsafe { std::slice::from_raw_parts_mut(buffers, length) };
+    let buffers = buffers.iter().map(|buffer| {
+        let buffer = unsafe { &mut **buffer };
+        buffer.0.clone()
+    }).collect::<Vec<node_buffer::Buffer>>();
     node_fs::sync::writev(
         fd, buffers, position.try_into().unwrap(),
     )
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
 }
 
 
 #[no_mangle]
-pub extern "C" fn fs_writev_sync_slice(fd: i32, buffers: &[&[u8]], position: i64) -> Result<usize> {
+pub extern "C" fn fs_writev_sync_slice(fd: i32, buffers: *const *const u8, length: usize, buffers_buffers: *const usize, buffers_buffers_length: usize, position: i64) -> usize {
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, buffers_buffers_length) };
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+    let buffers = buffers.iter().zip(buffer_length.iter())
+        .map(|(buffer, len)| {
+            unsafe { std::slice::from_raw_parts(*buffer, *len) }
+        }).collect::<Vec<_>>();
+
+
     node_fs::sync::writev_slice(
-        fd, buffers, position.try_into().unwrap(),
+        fd, buffers.as_slice(), position.try_into().unwrap(),
     )
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)).unwrap_or_else(|err| {
+        update_last_error(err);
+        0
+    })
 }
 
 // async
 
 #[no_mangle]
-pub extern "C" fn fs_async_access(path: &str, access: i32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_access(path: *const c_char, access: i32, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1604,11 +2054,20 @@ pub extern "C" fn fs_async_access(path: &str, access: i32, callback: &AsyncClosu
             }
         }))
     );
-    node_fs::a_sync::access(path, access, cb)
+    node_fs::a_sync::access(path.as_ref(), access, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_append_file_with_str(fd: i32, data: &str, options: ffi::AppendFileOptions, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_append_file_with_str(fd: i32, data: *const c_char, options: AppendFileOptions, callback: *const AsyncClosure) {
+    if data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1622,11 +2081,18 @@ pub extern "C" fn fs_async_append_file_with_str(fd: i32, data: &str, options: ff
             }
         }))
     );
-    node_fs::a_sync::append_file_with_str(fd, data, options.into(), cb)
+    node_fs::a_sync::append_file_with_str(fd, data.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_append_file_with_bytes(fd: i32, data: &Buffer, options: ffi::AppendFileOptions, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_append_file_with_bytes(fd: i32, data: *const Buffer, options: AppendFileOptions, callback: *const AsyncClosure) {
+    if data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { &*data };
+
+    let callback = unsafe { &*callback };
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1645,11 +2111,23 @@ pub extern "C" fn fs_async_append_file_with_bytes(fd: i32, data: &Buffer, option
 
 #[no_mangle]
 pub extern "C" fn fs_async_append_file_with_path_str(
-    path: &str,
-    data: &str,
-    options: ffi::AppendFileOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    data: *const c_char,
+    options: AppendFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1663,16 +2141,27 @@ pub extern "C" fn fs_async_append_file_with_path_str(
             }
         }))
     );
-    node_fs::a_sync::append_file_with_path_str(path, data, options.into(), cb)
+    node_fs::a_sync::append_file_with_path_str(path.as_ref(), data.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_append_file_with_path_bytes(
-    path: &str,
-    data: &Buffer,
-    options: ffi::AppendFileOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    data: *const Buffer,
+    options: AppendFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { &*data };
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1686,11 +2175,20 @@ pub extern "C" fn fs_async_append_file_with_path_bytes(
             }
         }))
     );
-    node_fs::a_sync::append_file_with_path_bytes(path, &data.0, options.into(), cb)
+    node_fs::a_sync::append_file_with_path_bytes(path.as_ref(), &data.0, options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_chmod(path: &str, mode: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_chmod(path: *const c_char, mode: u32, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1704,11 +2202,20 @@ pub extern "C" fn fs_async_chmod(path: &str, mode: u32, callback: &AsyncClosure)
             }
         }))
     );
-    node_fs::a_sync::chmod(path, mode, cb)
+    node_fs::a_sync::chmod(path.as_ref(), mode, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_chown(path: &str, uid: u32, gid: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_chown(path: *const c_char, uid: u32, gid: u32, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1723,11 +2230,17 @@ pub extern "C" fn fs_async_chown(path: &str, uid: u32, gid: u32, callback: &Asyn
         }))
     );
 
-    node_fs::a_sync::chown(path, uid, gid, cb)
+    node_fs::a_sync::chown(path.as_ref(), uid, gid, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_close(fd: i32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_close(fd: i32, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1745,7 +2258,19 @@ pub extern "C" fn fs_async_close(fd: i32, callback: &AsyncClosure) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_copy_file(src: &str, dest: &str, flag: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_copy_file(src: *const c_char, dest: *const c_char, flag: u32, callback: *const AsyncClosure) {
+    if src.is_null() || dest.is_null() || callback.is_null() {
+        return;
+    }
+
+    let src = unsafe { CStr::from_ptr(src) };
+    let src = src.to_string_lossy();
+
+    let dest = unsafe { CStr::from_ptr(dest) };
+    let dest = dest.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1759,14 +2284,23 @@ pub extern "C" fn fs_async_copy_file(src: &str, dest: &str, flag: u32, callback:
             }
         }))
     );
-    node_fs::a_sync::copy_file(src, dest, flag, cb)
+    node_fs::a_sync::copy_file(src.as_ref(), dest.as_ref(), flag, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_cp(_src: &str, _dest: &str) {}
+pub extern "C" fn fs_async_cp(_src: *const c_char, _dest: *const c_char) {}
 
 #[no_mangle]
-pub extern "C" fn fs_async_exists(path: &str, callback: &AsyncBoolClosure) {
+pub extern "C" fn fs_async_exists(path: *const c_char, callback: &AsyncBoolClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -1780,11 +2314,17 @@ pub extern "C" fn fs_async_exists(path: &str, callback: &AsyncBoolClosure) {
             }
         }))
     );
-    node_fs::a_sync::exists(path, cb)
+    node_fs::a_sync::exists(path.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_fchmod(fd: i32, mode: u16, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_fchmod(fd: i32, mode: u16, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1802,7 +2342,13 @@ pub extern "C" fn fs_async_fchmod(fd: i32, mode: u16, callback: &AsyncClosure) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_fchown(fd: i32, uid: u32, gid: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_fchown(fd: i32, uid: u32, gid: u32, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1820,7 +2366,13 @@ pub extern "C" fn fs_async_fchown(fd: i32, uid: u32, gid: u32, callback: &AsyncC
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_fdatasync(fd: i32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_fdatasync(fd: i32, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1838,7 +2390,13 @@ pub extern "C" fn fs_async_fdatasync(fd: i32, callback: &AsyncClosure) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_fstat(fd: i32, callback: &AsyncFileStatClosure) {
+pub extern "C" fn fs_async_fstat(fd: i32, callback: *const AsyncFileStatClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -1856,7 +2414,13 @@ pub extern "C" fn fs_async_fstat(fd: i32, callback: &AsyncFileStatClosure) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_fsync(fd: i32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_fsync(fd: i32, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1874,7 +2438,13 @@ pub extern "C" fn fs_async_fsync(fd: i32, callback: &AsyncClosure) {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_ftruncate(fd: i32, len: i64, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_ftruncate(fd: i32, len: i64, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1892,7 +2462,12 @@ pub extern "C" fn fs_async_ftruncate(fd: i32, len: i64, callback: &AsyncClosure)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: *const AsyncClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1910,7 +2485,15 @@ pub extern "C" fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: &A
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_lchmod(path: &str, mode: u16, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_lchmod(path: *const c_char, mode: u16, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1924,11 +2507,20 @@ pub extern "C" fn fs_async_lchmod(path: &str, mode: u16, callback: &AsyncClosure
             }
         }))
     );
-    node_fs::a_sync::lchmod(path, mode, cb)
+    node_fs::a_sync::lchmod(path.as_ref(), mode, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_lchown(path: &str, uid: u32, gid: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_lchown(path: *const c_char, uid: u32, gid: u32, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1942,11 +2534,20 @@ pub extern "C" fn fs_async_lchown(path: &str, uid: u32, gid: u32, callback: &Asy
             }
         }))
     );
-    node_fs::a_sync::lchown(path, uid, gid, cb)
+    node_fs::a_sync::lchown(path.as_ref(), uid, gid, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_lutimes(path: &str, atime: i64, mtime: i64, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_lutimes(path: *const c_char, atime: i64, mtime: i64, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1960,11 +2561,23 @@ pub extern "C" fn fs_async_lutimes(path: &str, atime: i64, mtime: i64, callback:
             }
         }))
     );
-    node_fs::a_sync::lutimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
+    node_fs::a_sync::lutimes(path.as_ref(), atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_link(existing_path: &str, new_path: &str, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_link(existing_path: *const c_char, new_path: *const c_char, callback: *const AsyncClosure) {
+    if existing_path.is_null() || new_path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let existing_path = unsafe { CStr::from_ptr(existing_path) };
+    let existing_path = existing_path.to_string_lossy();
+
+    let new_path = unsafe { CStr::from_ptr(new_path) };
+    let new_path = new_path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -1978,11 +2591,20 @@ pub extern "C" fn fs_async_link(existing_path: &str, new_path: &str, callback: &
             }
         }))
     );
-    node_fs::a_sync::link(existing_path, new_path, cb)
+    node_fs::a_sync::link(existing_path.as_ref(), new_path.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_lstat(path: &str, callback: &AsyncFileStatClosure) {
+pub extern "C" fn fs_async_lstat(path: *const c_char, callback: *const AsyncFileStatClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -1997,11 +2619,20 @@ pub extern "C" fn fs_async_lstat(path: &str, callback: &AsyncFileStatClosure) {
         }))
     );
 
-    node_fs::a_sync::lstat(path, cb)
+    node_fs::a_sync::lstat(path.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_mkdir(path: &str, options: ffi::MkDirOptions, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_mkdir(path: *const c_char, options: MkDirOptions, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2015,11 +2646,20 @@ pub extern "C" fn fs_async_mkdir(path: &str, options: ffi::MkDirOptions, callbac
             }
         }))
     );
-    node_fs::a_sync::mkdir(path, options.into(), cb)
+    node_fs::a_sync::mkdir(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_mkdtemp(prefix: &str, options: ffi::MkdTempOptions, callback: &AsyncStringClosure) {
+pub extern "C" fn fs_async_mkdtemp(prefix: *const c_char, options: MkdTempOptions, callback: *const AsyncStringClosure) {
+    if prefix.is_null() || callback.is_null() {
+        return;
+    }
+
+    let prefix = unsafe { CStr::from_ptr(prefix) };
+    let prefix = prefix.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |path, error| {
@@ -2033,11 +2673,20 @@ pub extern "C" fn fs_async_mkdtemp(prefix: &str, options: ffi::MkdTempOptions, c
             }
         }))
     );
-    node_fs::a_sync::mkdtemp(prefix, options.into(), cb);
+    node_fs::a_sync::mkdtemp(prefix.as_ref(), options.into(), cb);
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_open(path: &str, flag: i32, mode: i32, callback: &AsyncI32Closure) {
+pub extern "C" fn fs_async_open(path: *const c_char, flag: i32, mode: i32, callback: *const AsyncI32Closure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2051,11 +2700,20 @@ pub extern "C" fn fs_async_open(path: &str, flag: i32, mode: i32, callback: &Asy
             }
         }))
     );
-    node_fs::a_sync::open(path, flag, mode, cb);
+    node_fs::a_sync::open(path.as_ref(), flag, mode, cb);
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_opendir(path: &str, options: ffi::OpenDirOptions, callback: &AsyncFileDirClosure) {
+pub extern "C" fn fs_async_opendir(path: *const c_char, options: OpenDirOptions, callback: *const AsyncFileDirClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2069,7 +2727,7 @@ pub extern "C" fn fs_async_opendir(path: &str, options: ffi::OpenDirOptions, cal
             }
         }))
     );
-    node_fs::a_sync::opendir(path, options.into(), cb);
+    node_fs::a_sync::opendir(path.as_ref(), options.into(), cb);
 }
 
 #[no_mangle]
@@ -2079,8 +2737,16 @@ pub extern "C" fn fs_async_read(
     offset: usize,
     length: usize,
     position: isize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if buffer.is_null() || callback.is_null() {
+        return;
+    }
+
+    let buffer = unsafe { &mut *buffer };
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2100,10 +2766,19 @@ pub extern "C" fn fs_async_read(
 
 #[no_mangle]
 pub extern "C" fn fs_async_readdir(
-    path: &str,
-    options: ffi::ReaddirOptions,
-    callback: &AsyncReaddirClosure,
+    path: *const c_char,
+    options: ReaddirOptions,
+    callback: *const AsyncReaddirClosure,
 ) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result: Option<Vec<node_fs::sync::ReaddirResult>>, error| {
@@ -2120,11 +2795,20 @@ pub extern "C" fn fs_async_readdir(
         }))
     );
 
-    node_fs::a_sync::readdir(path, options.into(), cb)
+    node_fs::a_sync::readdir(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_read_file(path: &str, options: ffi::ReadFileOptions, callback: &AsyncFsEncodingClosure) {
+pub extern "C" fn fs_async_read_file(path: *const c_char, options: ReadFileOptions, callback: *const AsyncFsEncodingClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2139,11 +2823,17 @@ pub extern "C" fn fs_async_read_file(path: &str, options: ffi::ReadFileOptions, 
         }))
     );
 
-    node_fs::a_sync::read_file(path, options.into(), cb)
+    node_fs::a_sync::read_file(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_read_file_with_fd(fd: i32, options: ffi::ReadFileOptions, callback: &AsyncFsEncodingClosure) {
+pub extern "C" fn fs_async_read_file_with_fd(fd: i32, options: ReadFileOptions, callback: *const AsyncFsEncodingClosure) {
+    if callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2162,7 +2852,16 @@ pub extern "C" fn fs_async_read_file_with_fd(fd: i32, options: ffi::ReadFileOpti
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_read_link(path: &str, options: ffi::ReadLinkOptions, callback: &AsyncFsEncodingClosure) {
+pub extern "C" fn fs_async_read_link(path: *const c_char, options: ReadLinkOptions, callback: *const AsyncFsEncodingClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2177,16 +2876,25 @@ pub extern "C" fn fs_async_read_link(path: &str, options: ffi::ReadLinkOptions, 
         }))
     );
 
-    node_fs::a_sync::read_link(path, options.into(), cb)
+    node_fs::a_sync::read_link(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_readv(
     fd: i32,
-    buffers: Vec<Buffer>,
+    buffers: *const Buffer,
+    length: usize,
     position: usize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if buffers.is_null() || length == 0 || callback.is_null() {
+        return;
+    }
+
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2207,7 +2915,16 @@ pub extern "C" fn fs_async_readv(
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_real_path(path: &str, options: ffi::RealPathOptions, callback: &AsyncStringClosure) {
+pub extern "C" fn fs_async_real_path(path: *const c_char, options: RealPathOptions, callback: *const AsyncStringClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result: Option<std::path::PathBuf>, error| {
@@ -2222,11 +2939,23 @@ pub extern "C" fn fs_async_real_path(path: &str, options: ffi::RealPathOptions, 
         }))
     );
 
-    node_fs::a_sync::real_path(path, options.into(), cb)
+    node_fs::a_sync::real_path(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_rename(old_path: &str, new_path: &str, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_rename(old_path: *const c_char, new_path: *const c_char, callback: *const AsyncClosure) {
+    if old_path.is_null() || new_path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let old_path = unsafe { CStr::from_ptr(old_path) };
+    let old_path = old_path.to_string_lossy();
+
+    let new_path = unsafe { CStr::from_ptr(new_path) };
+    let new_path = new_path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2240,15 +2969,24 @@ pub extern "C" fn fs_async_rename(old_path: &str, new_path: &str, callback: &Asy
             }
         }))
     );
-    node_fs::a_sync::rename(old_path, new_path, cb)
+    node_fs::a_sync::rename(old_path.as_ref(), new_path.as_ref(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_rmdir(
-    path: &str,
-    options: ffi::RmDirOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    options: RmDirOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2262,15 +3000,24 @@ pub extern "C" fn fs_async_rmdir(
             }
         }))
     );
-    node_fs::a_sync::rmdir(path, options.into(), cb)
+    node_fs::a_sync::rmdir(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_rm(
-    path: &str,
-    options: ffi::RmOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    options: RmOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2283,11 +3030,20 @@ pub extern "C" fn fs_async_rm(
             }
         }))
     );
-    node_fs::a_sync::rm(path, options.into(), cb)
+    node_fs::a_sync::rm(path.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_stat(path: &str, throw_if_no_entry: bool, callback: &AsyncFileStatClosure) {
+pub extern "C" fn fs_async_stat(path: *const c_char, throw_if_no_entry: bool, callback: *const AsyncFileStatClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result: Option<node_fs::file_stat::FileStat>, error| {
@@ -2301,11 +3057,27 @@ pub extern "C" fn fs_async_stat(path: &str, throw_if_no_entry: bool, callback: &
             }
         }))
     );
-    node_fs::a_sync::stat(path, throw_if_no_entry, cb)
+    node_fs::a_sync::stat(path.as_ref(), throw_if_no_entry, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_symlink(target: &str, path: &str, type_: &str, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_symlink(target: *const c_char, path: *const c_char, type_: *const c_char, callback: *const AsyncClosure) {
+    if target.is_null() || path.is_null() || type_.is_null() || callback.is_null() {
+        return;
+    }
+
+    let target = unsafe { CStr::from_ptr(target) };
+    let target = target.to_string_lossy();
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+
+    let type_ = unsafe { CStr::from_ptr(type_) };
+    let type_ = type_.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2319,11 +3091,20 @@ pub extern "C" fn fs_async_symlink(target: &str, path: &str, type_: &str, callba
             }
         }))
     );
-    node_fs::a_sync::symlink(target, path, type_, cb)
+    node_fs::a_sync::symlink(target.as_ref(), path.as_ref(), type_.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_truncate(path: &str, len: u64, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_truncate(path: *const c_char, len: u64, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2337,11 +3118,20 @@ pub extern "C" fn fs_async_truncate(path: &str, len: u64, callback: &AsyncClosur
             }
         }))
     );
-    node_fs::a_sync::truncate(path, len, cb)
+    node_fs::a_sync::truncate(path.as_ref(), len, cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_unlink(path: &str, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_unlink(path: *const c_char, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2355,16 +3145,32 @@ pub extern "C" fn fs_async_unlink(path: &str, callback: &AsyncClosure) {
             }
         }))
     );
-    node_fs::a_sync::unlink(path, cb)
+    node_fs::a_sync::unlink(path.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_unwatch_file(filename: &str) {
-    node_fs::a_sync::unwatch_file(filename, None)
+pub extern "C" fn fs_async_unwatch_file(filename: *const c_char) {
+    if filename.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    node_fs::a_sync::unwatch_file(filename.as_ref(), None)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_unwatch_file_with_callback(filename: &str, callback: &AsyncFileWatchClosure) {
+pub extern "C" fn fs_async_unwatch_file_with_callback(filename: *const c_char, callback: *const AsyncFileWatchClosure) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2378,11 +3184,20 @@ pub extern "C" fn fs_async_unwatch_file_with_callback(filename: &str, callback: 
             }
         }))
     );
-    node_fs::a_sync::unwatch_file(filename, Some(cb))
+    node_fs::a_sync::unwatch_file(filename.as_ref(), Some(cb))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_utimes(path: &str, atime: i64, mtime: i64, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_utimes(path: *const c_char, atime: i64, mtime: i64, callback: *const AsyncClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2396,11 +3211,20 @@ pub extern "C" fn fs_async_utimes(path: &str, atime: i64, mtime: i64, callback: 
             }
         }))
     );
-    node_fs::a_sync::utimes(path, atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
+    node_fs::a_sync::utimes(path.as_ref(), atime.try_into().unwrap(), mtime.try_into().unwrap(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_file_watcher_unref(filename: &str, callback: &AsyncFileWatchClosure) {
+pub extern "C" fn fs_async_file_watcher_unref(filename: *const c_char, callback: *const AsyncFileWatchClosure) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2414,11 +3238,20 @@ pub extern "C" fn fs_async_file_watcher_unref(filename: &str, callback: &AsyncFi
             }
         }))
     );
-    node_fs::a_sync::file_watcher_unref(filename, cb);
+    node_fs::a_sync::file_watcher_unref(filename.as_ref(), cb);
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_file_watcher_ref(filename: &str, callback: &AsyncFileWatchClosure) {
+pub extern "C" fn fs_async_file_watcher_ref(filename: *const c_char, callback: *const AsyncFileWatchClosure) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2432,17 +3265,26 @@ pub extern "C" fn fs_async_file_watcher_ref(filename: &str, callback: &AsyncFile
             }
         }))
     );
-    node_fs::a_sync::file_watcher_ref(filename, cb)
+    node_fs::a_sync::file_watcher_ref(filename.as_ref(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_watch(
-    filename: &str,
+    filename: *const c_char,
     persistent: bool,
     recursive: bool,
-    encoding: ffi::FsEncodingType,
-    callback: &AsyncWatchClosure,
+    encoding: FsEncodingType,
+    callback: *const AsyncWatchClosure,
 ) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2458,12 +3300,21 @@ pub extern "C" fn fs_async_watch(
     );
 
     node_fs::a_sync::watch(
-        filename, persistent, recursive, encoding.into(), cb,
+        filename.as_ref(), persistent, recursive, encoding.into(), cb,
     )
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_watcher_unref(filename: &str, callback: &AsyncWatchClosure) {
+pub extern "C" fn fs_async_watcher_unref(filename: *const c_char, callback: *const AsyncWatchClosure) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2478,11 +3329,20 @@ pub extern "C" fn fs_async_watcher_unref(filename: &str, callback: &AsyncWatchCl
         }))
     );
 
-    node_fs::a_sync::watcher_unref(filename, cb)
+    node_fs::a_sync::watcher_unref(filename.as_ref(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_watcher_ref(filename: &str, callback: &AsyncWatchClosure) {
+pub extern "C" fn fs_async_watcher_ref(filename: *const c_char, callback: *const AsyncWatchClosure) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2496,15 +3356,26 @@ pub extern "C" fn fs_async_watcher_ref(filename: &str, callback: &AsyncWatchClos
             }
         }))
     );
-    node_fs::a_sync::watcher_ref(filename, cb)
+    node_fs::a_sync::watcher_ref(filename.as_ref(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_watcher_close(
-    filename: &str,
-    callback: &AsyncWatchClosure,
-    on_close: &AsyncClosure,
+    filename: *const c_char,
+    callback: *const AsyncWatchClosure,
+    on_close: *const AsyncClosure,
 ) {
+    if filename.is_null() || callback.is_null() || on_close.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
+    let on_close = unsafe { &*on_close };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2535,18 +3406,27 @@ pub extern "C" fn fs_async_watcher_close(
     );
 
 
-    node_fs::a_sync::watcher_close(filename, cb, on_close_cb)
+    node_fs::a_sync::watcher_close(filename.as_ref(), cb, on_close_cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_watch_file(
-    filename: &str,
+    filename: *const c_char,
     bigint: bool,
     persistent: bool,
     interval: u64,
-    encoding: ffi::FsEncodingType,
-    callback: &AsyncFileWatchClosure,
+    encoding: FsEncodingType,
+    callback: *const AsyncFileWatchClosure,
 ) {
+    if filename.is_null() || callback.is_null() {
+        return;
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename) };
+    let filename = filename.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |event, error| {
@@ -2561,16 +3441,24 @@ pub extern "C" fn fs_async_watch_file(
         }))
     );
 
-    node_fs::a_sync::watch_file(filename, bigint, persistent, interval.try_into().unwrap(), encoding.into(), cb)
+    node_fs::a_sync::watch_file(filename.as_ref(), bigint, persistent, interval.try_into().unwrap(), encoding.into(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_write(
     fd: i32,
     buffer: *const Buffer,
-    options: ffi::WriteOptions,
-    callback: &AsyncUsizeClosure,
+    options: WriteOptions,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if buffer.is_null() || callback.is_null() {
+        return;
+    }
+
+    let buffer = unsafe { &*buffer };
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -2591,11 +3479,20 @@ pub extern "C" fn fs_async_write(
 #[no_mangle]
 pub extern "C" fn fs_async_write_string(
     fd: i32,
-    string: &str,
-    encoding: ffi::StringEncoding,
+    string: *const c_char,
+    encoding: StringEncoding,
     position: isize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if string.is_null() || callback.is_null() {
+        return;
+    }
+
+    let string = unsafe { CStr::from_ptr(string) };
+    let string = string.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -2609,16 +3506,25 @@ pub extern "C" fn fs_async_write_string(
             }
         }))
     );
-    node_fs::a_sync::write_string(fd, string, encoding.into(), position, cb)
+    node_fs::a_sync::write_string(fd, string.as_ref(), encoding.into(), position, cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_write_file_with_str(
     fd: i32,
-    data: &str,
-    options: ffi::WriteFileOptions,
-    callback: &AsyncClosure,
+    data: *const c_char,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2632,11 +3538,19 @@ pub extern "C" fn fs_async_write_file_with_str(
             }
         }))
     );
-    node_fs::a_sync::write_file_with_str(fd, data, options.into(), cb)
+    node_fs::a_sync::write_file_with_str(fd, data.as_ref(), options.into(), cb)
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_write_file_with_bytes(fd: i32, data: &Buffer, options: ffi::WriteFileOptions, callback: &AsyncClosure) {
+pub extern "C" fn fs_async_write_file_with_bytes(fd: i32, data: *const Buffer, options: WriteFileOptions, callback: *const AsyncClosure) {
+    if data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { &*data };
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2655,11 +3569,23 @@ pub extern "C" fn fs_async_write_file_with_bytes(fd: i32, data: &Buffer, options
 
 #[no_mangle]
 pub extern "C" fn fs_async_write_file_with_str_from_path(
-    path: &str,
-    data: &str,
-    options: ffi::WriteFileOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    data: *const c_char,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2674,17 +3600,29 @@ pub extern "C" fn fs_async_write_file_with_str_from_path(
         }))
     );
     node_fs::a_sync::write_file_with_str_from_path(
-        path, data, options.into(), cb,
+        path.as_ref(), data.as_ref(), options.into(), cb,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_write_file_with_bytes_from_path(
-    path: &str,
-    data: &Buffer,
-    options: ffi::WriteFileOptions,
-    callback: &AsyncClosure,
+    path: *const c_char,
+    data: *const Buffer,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if path.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let data = unsafe { &*data };
+
+    let callback = unsafe { &*callback };
+
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2698,16 +3636,26 @@ pub extern "C" fn fs_async_write_file_with_bytes_from_path(
             }
         }))
     );
-    node_fs::a_sync::write_file_with_bytes_from_path(path, &data.0, options.into(), cb)
+    node_fs::a_sync::write_file_with_bytes_from_path(path.as_ref(), &data.0, options.into(), cb)
 }
 
 #[no_mangle]
 pub extern "C" fn fs_async_writev(
     fd: i32,
-    buffers: Vec<Buffer>,
+    buffers: *const Buffer,
+    length: usize,
     position: usize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if buffers.is_null() || length == 0 || callback.is_null() {
+        return;
+    }
+
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+    let callback = unsafe { &*callback };
+
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -2733,11 +3681,20 @@ pub extern "C" fn fs_async_writev(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_new_async(
-    path: &str,
+    path: *const c_char,
     flags: i32,
     mode: i32,
-    callback: &AsyncFileHandleClosure,
+    callback: *const AsyncFileHandleClosure,
 ) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |handle, error| {
@@ -2755,17 +3712,28 @@ pub extern "C" fn fs_handle_new_async(
     );
 
     node_fs::file_handle::FileHandle::new_async(
-        path, flags, mode, cb,
+        path.as_ref(), flags, mode, cb,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn fs_handle_append_file_with_str(
-    handle: &mut FileHandle,
-    data: &str,
-    options: ffi::AppendFileOptions,
-    callback: &AsyncClosure,
+    handle: *mut FileHandle,
+    data: *const c_char,
+    options: AppendFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2781,17 +3749,27 @@ pub extern "C" fn fs_handle_append_file_with_str(
     );
 
     handle.0.append_file_with_str(
-        data, options.into(), cb,
+        data.as_ref(), options.into(), cb,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn fs_handle_append_file_with_bytes(
-    handle: &mut FileHandle,
-    data: &Buffer,
-    options: ffi::AppendFileOptions,
-    callback: &AsyncClosure,
+    handle: *mut FileHandle,
+    data: *const Buffer,
+    options: AppendFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let data = unsafe { &*data };
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2812,7 +3790,15 @@ pub extern "C" fn fs_handle_append_file_with_bytes(
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_chmod(handle: &mut FileHandle, mode: u16, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_chmod(handle: *mut FileHandle, mode: u16, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2833,7 +3819,15 @@ pub extern "C" fn fs_handle_chmod(handle: &mut FileHandle, mode: u16, callback: 
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_chown(handle: &mut FileHandle, uid: u32, gid: u32, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_chown(handle: *mut FileHandle, uid: u32, gid: u32, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2854,7 +3848,15 @@ pub extern "C" fn fs_handle_chown(handle: &mut FileHandle, uid: u32, gid: u32, c
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_close(handle: Box<FileHandle>, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_close(handle: *mut FileHandle, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2876,14 +3878,22 @@ pub extern "C" fn fs_handle_close(handle: Box<FileHandle>, callback: &AsyncClosu
 
 // TODO
 // #[no_mangle]
-pub extern "C" fn fs_handle_createReadStream() {}
+// pub extern "C" fn fs_handle_create_read_stream() {}
 
 // TODO
 // #[no_mangle]
-pub extern "C" fn fs_handle_createWriteStream() {}
+// pub extern "C" fn fs_handle_create_write_stream() {}
 
 #[no_mangle]
-pub extern "C" fn fs_handle_datasync(handle: &mut FileHandle, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_datasync(handle: *mut FileHandle, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -2904,19 +3914,35 @@ pub extern "C" fn fs_handle_datasync(handle: &mut FileHandle, callback: &AsyncCl
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_fd(handle: &mut FileHandle) -> i32 {
+pub extern "C" fn fs_handle_fd(handle: *mut FileHandle) -> i32 {
+    if handle.is_null() {
+        return 0;
+    }
+
+    let handle = unsafe { &mut *handle };
+
     handle.0.fd()
 }
 
 #[no_mangle]
 pub extern "C" fn fs_handle_read(
-    handle: &mut FileHandle,
+    handle: *mut FileHandle,
     buffer: *mut Buffer,
     offset: usize,
     length: usize,
     position: isize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let buffer = unsafe { &mut *buffer };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |read, error| {
@@ -2938,10 +3964,18 @@ pub extern "C" fn fs_handle_read(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_read_file(
-    handle: &mut FileHandle,
-    options: ffi::ReadFileOptions,
-    callback: &AsyncFsEncodingClosure,
+    handle: *mut FileHandle,
+    options: ReadFileOptions,
+    callback: *const AsyncFsEncodingClosure,
 ) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
@@ -2963,11 +3997,22 @@ pub extern "C" fn fs_handle_read_file(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_readv(
-    handle: &mut FileHandle,
-    buffers: Vec<Buffer>,
+    handle: *mut FileHandle,
+    buffers: *const Buffer,
+    length: usize,
     position: usize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if handle.is_null() || buffers.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |read, error| {
@@ -2991,7 +4036,15 @@ pub extern "C" fn fs_handle_readv(
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_stat(handle: &mut FileHandle, callback: &AsyncFileStatClosure) {
+pub extern "C" fn fs_handle_stat(handle: *mut FileHandle, callback: *const AsyncFileStatClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |stat: Option<node_fs::file_stat::FileStat>, error| {
@@ -3012,7 +4065,15 @@ pub extern "C" fn fs_handle_stat(handle: &mut FileHandle, callback: &AsyncFileSt
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_sync(handle: &mut FileHandle, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_sync(handle: *mut FileHandle, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -3033,7 +4094,15 @@ pub extern "C" fn fs_handle_sync(handle: &mut FileHandle, callback: &AsyncClosur
 }
 
 #[no_mangle]
-pub extern "C" fn fs_handle_truncate(handle: &mut FileHandle, len: usize, callback: &AsyncClosure) {
+pub extern "C" fn fs_handle_truncate(handle: *mut FileHandle, len: usize, callback: *const AsyncClosure) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -3055,11 +4124,19 @@ pub extern "C" fn fs_handle_truncate(handle: &mut FileHandle, len: usize, callba
 
 #[no_mangle]
 pub extern "C" fn fs_handle_utimes(
-    handle: &mut FileHandle,
+    handle: *mut FileHandle,
     atime: usize,
     mtime: usize,
-    callback: &AsyncClosure,
+    callback: *const AsyncClosure,
 ) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -3081,11 +4158,21 @@ pub extern "C" fn fs_handle_utimes(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_write(
-    handle: &mut FileHandle,
+    handle: *mut FileHandle,
     buffer: *const Buffer,
-    options: ffi::WriteOptions,
-    callback: &AsyncUsizeClosure,
+    options: WriteOptions,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let buffer = unsafe { &*buffer };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -3107,12 +4194,23 @@ pub extern "C" fn fs_handle_write(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_write_string(
-    handle: &mut FileHandle,
-    data: &str,
-    encoding: ffi::StringEncoding,
+    handle: *mut FileHandle,
+    data: *const c_char,
+    encoding: StringEncoding,
     position: isize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -3128,17 +4226,28 @@ pub extern "C" fn fs_handle_write_string(
     );
 
     handle.0.write_string(
-        data, encoding.into(), position, cb,
+        data.as_ref(), encoding.into(), position, cb,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn fs_handle_write_file_with_str(
-    handle: &mut FileHandle,
-    data: &str,
-    options: ffi::WriteFileOptions,
-    callback: &AsyncClosure,
+    handle: *mut FileHandle,
+    data: *const c_char,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let data = unsafe { CStr::from_ptr(data) };
+    let data = data.to_string_lossy();
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -3154,17 +4263,27 @@ pub extern "C" fn fs_handle_write_file_with_str(
     );
 
     handle.0.write_file_with_str(
-        data, options.into(), cb,
+        data.as_ref(), options.into(), cb,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn fs_handle_write_file_with_bytes(
-    handle: &mut FileHandle,
-    data: &Buffer,
-    options: ffi::WriteFileOptions,
-    callback: &AsyncClosure,
+    handle: *mut FileHandle,
+    data: *const Buffer,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
 ) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let data = unsafe { &*data };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
@@ -3186,11 +4305,22 @@ pub extern "C" fn fs_handle_write_file_with_bytes(
 
 #[no_mangle]
 pub extern "C" fn fs_handle_writev(
-    handle: &mut FileHandle,
-    buffers: Vec<Buffer>,
+    handle: *mut FileHandle,
+    buffers: *const Buffer,
+    length: usize,
     position: usize,
-    callback: &AsyncUsizeClosure,
+    callback: *const AsyncUsizeClosure,
 ) {
+    if handle.is_null() || buffers.is_null() || length == 0 || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
@@ -3231,7 +4361,7 @@ pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), Error>>);
 pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, Error>>);
 
 #[derive(Clone)]
-pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<ffi::FileStat, Error>>);
+pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<FileStat, Error>>);
 
 #[derive(Clone)]
 pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, Error>>);
@@ -3260,7 +4390,7 @@ pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, Error>
 #[derive(Clone)]
 pub struct AsyncFileHandleClosure(Arc<node_fs::a_sync::AsyncClosure<Box<FileHandle>, Error>>);
 
-impl Into<node_fs::sync::AppendFileOptions> for ffi::AppendFileOptions {
+impl Into<node_fs::sync::AppendFileOptions> for AppendFileOptions {
     fn into(self) -> node_fs::sync::AppendFileOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3268,7 +4398,7 @@ impl Into<node_fs::sync::AppendFileOptions> for ffi::AppendFileOptions {
     }
 }
 
-impl Into<node_fs::sync::MkDirOptions> for ffi::MkDirOptions {
+impl Into<node_fs::sync::MkDirOptions> for MkDirOptions {
     fn into(self) -> node_fs::sync::MkDirOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3276,7 +4406,7 @@ impl Into<node_fs::sync::MkDirOptions> for ffi::MkDirOptions {
     }
 }
 
-impl Into<node_fs::sync::MkdTempOptions> for ffi::MkdTempOptions {
+impl Into<node_fs::sync::MkdTempOptions> for MkdTempOptions {
     fn into(self) -> node_fs::sync::MkdTempOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3284,7 +4414,7 @@ impl Into<node_fs::sync::MkdTempOptions> for ffi::MkdTempOptions {
     }
 }
 
-impl Into<node_fs::sync::OpenDirOptions> for ffi::OpenDirOptions {
+impl Into<node_fs::sync::OpenDirOptions> for OpenDirOptions {
     fn into(self) -> node_fs::sync::OpenDirOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3292,7 +4422,7 @@ impl Into<node_fs::sync::OpenDirOptions> for ffi::OpenDirOptions {
     }
 }
 
-impl Into<node_fs::sync::ReaddirOptions> for ffi::ReaddirOptions {
+impl Into<node_fs::sync::ReaddirOptions> for ReaddirOptions {
     fn into(self) -> node_fs::sync::ReaddirOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3300,7 +4430,7 @@ impl Into<node_fs::sync::ReaddirOptions> for ffi::ReaddirOptions {
     }
 }
 
-impl Into<node_fs::sync::ReadFileOptions> for ffi::ReadFileOptions {
+impl Into<node_fs::sync::ReadFileOptions> for ReadFileOptions {
     fn into(self) -> node_fs::sync::ReadFileOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3308,7 +4438,7 @@ impl Into<node_fs::sync::ReadFileOptions> for ffi::ReadFileOptions {
     }
 }
 
-impl Into<node_fs::sync::ReadLinkOptions> for ffi::ReadLinkOptions {
+impl Into<node_fs::sync::ReadLinkOptions> for ReadLinkOptions {
     fn into(self) -> node_fs::sync::ReadLinkOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3316,7 +4446,7 @@ impl Into<node_fs::sync::ReadLinkOptions> for ffi::ReadLinkOptions {
     }
 }
 
-impl Into<node_fs::sync::RealPathOptions> for ffi::RealPathOptions {
+impl Into<node_fs::sync::RealPathOptions> for RealPathOptions {
     fn into(self) -> node_fs::sync::RealPathOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3324,7 +4454,7 @@ impl Into<node_fs::sync::RealPathOptions> for ffi::RealPathOptions {
     }
 }
 
-impl Into<node_fs::sync::RmDirOptions> for ffi::RmDirOptions {
+impl Into<node_fs::sync::RmDirOptions> for RmDirOptions {
     fn into(self) -> node_fs::sync::RmDirOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3332,7 +4462,7 @@ impl Into<node_fs::sync::RmDirOptions> for ffi::RmDirOptions {
     }
 }
 
-impl Into<node_fs::sync::RmOptions> for ffi::RmOptions {
+impl Into<node_fs::sync::RmOptions> for RmOptions {
     fn into(self) -> node_fs::sync::RmOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3340,7 +4470,7 @@ impl Into<node_fs::sync::RmOptions> for ffi::RmOptions {
     }
 }
 
-impl Into<node_fs::sync::WriteOptions> for ffi::WriteOptions {
+impl Into<node_fs::sync::WriteOptions> for WriteOptions {
     fn into(self) -> node_fs::sync::WriteOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3348,7 +4478,7 @@ impl Into<node_fs::sync::WriteOptions> for ffi::WriteOptions {
     }
 }
 
-impl Into<node_fs::sync::WriteFileOptions> for ffi::WriteFileOptions {
+impl Into<node_fs::sync::WriteFileOptions> for WriteFileOptions {
     fn into(self) -> node_fs::sync::WriteFileOptions {
         unsafe {
             std::mem::transmute_copy(&self)
@@ -3357,7 +4487,7 @@ impl Into<node_fs::sync::WriteFileOptions> for ffi::WriteFileOptions {
 }
 
 
-impl From<node_fs::sync::AppendFileOptions> for ffi::AppendFileOptions {
+impl From<node_fs::sync::AppendFileOptions> for AppendFileOptions {
     fn from(value: node_fs::sync::AppendFileOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3365,7 +4495,7 @@ impl From<node_fs::sync::AppendFileOptions> for ffi::AppendFileOptions {
     }
 }
 
-impl From<node_fs::sync::MkDirOptions> for ffi::MkDirOptions {
+impl From<node_fs::sync::MkDirOptions> for MkDirOptions {
     fn from(value: node_fs::sync::MkDirOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3373,7 +4503,7 @@ impl From<node_fs::sync::MkDirOptions> for ffi::MkDirOptions {
     }
 }
 
-impl From<node_fs::sync::MkdTempOptions> for ffi::MkdTempOptions {
+impl From<node_fs::sync::MkdTempOptions> for MkdTempOptions {
     fn from(value: node_fs::sync::MkdTempOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3381,7 +4511,7 @@ impl From<node_fs::sync::MkdTempOptions> for ffi::MkdTempOptions {
     }
 }
 
-impl From<node_fs::sync::OpenDirOptions> for ffi::OpenDirOptions {
+impl From<node_fs::sync::OpenDirOptions> for OpenDirOptions {
     fn from(value: node_fs::sync::OpenDirOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3389,7 +4519,7 @@ impl From<node_fs::sync::OpenDirOptions> for ffi::OpenDirOptions {
     }
 }
 
-impl From<node_fs::sync::ReaddirOptions> for ffi::ReaddirOptions {
+impl From<node_fs::sync::ReaddirOptions> for ReaddirOptions {
     fn from(value: node_fs::sync::ReaddirOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3397,7 +4527,7 @@ impl From<node_fs::sync::ReaddirOptions> for ffi::ReaddirOptions {
     }
 }
 
-impl From<node_fs::sync::ReadFileOptions> for ffi::ReadFileOptions {
+impl From<node_fs::sync::ReadFileOptions> for ReadFileOptions {
     fn from(value: node_fs::sync::ReadFileOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3405,7 +4535,7 @@ impl From<node_fs::sync::ReadFileOptions> for ffi::ReadFileOptions {
     }
 }
 
-impl From<node_fs::sync::ReadLinkOptions> for ffi::ReadLinkOptions {
+impl From<node_fs::sync::ReadLinkOptions> for ReadLinkOptions {
     fn from(value: node_fs::sync::ReadLinkOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3413,7 +4543,7 @@ impl From<node_fs::sync::ReadLinkOptions> for ffi::ReadLinkOptions {
     }
 }
 
-impl From<node_fs::sync::RealPathOptions> for ffi::RealPathOptions {
+impl From<node_fs::sync::RealPathOptions> for RealPathOptions {
     fn from(value: node_fs::sync::RealPathOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3421,7 +4551,7 @@ impl From<node_fs::sync::RealPathOptions> for ffi::RealPathOptions {
     }
 }
 
-impl From<node_fs::sync::RmDirOptions> for ffi::RmDirOptions {
+impl From<node_fs::sync::RmDirOptions> for RmDirOptions {
     fn from(value: node_fs::sync::RmDirOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3429,7 +4559,7 @@ impl From<node_fs::sync::RmDirOptions> for ffi::RmDirOptions {
     }
 }
 
-impl From<node_fs::sync::RmOptions> for ffi::RmOptions {
+impl From<node_fs::sync::RmOptions> for RmOptions {
     fn from(value: node_fs::sync::RmOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3437,7 +4567,7 @@ impl From<node_fs::sync::RmOptions> for ffi::RmOptions {
     }
 }
 
-impl From<node_fs::sync::WriteOptions> for ffi::WriteOptions {
+impl From<node_fs::sync::WriteOptions> for WriteOptions {
     fn from(value: node_fs::sync::WriteOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3445,7 +4575,7 @@ impl From<node_fs::sync::WriteOptions> for ffi::WriteOptions {
     }
 }
 
-impl From<node_fs::sync::WriteFileOptions> for ffi::WriteFileOptions {
+impl From<node_fs::sync::WriteFileOptions> for WriteFileOptions {
     fn from(value: node_fs::sync::WriteFileOptions) -> Self {
         unsafe {
             std::mem::transmute_copy(&value)
@@ -3454,7 +4584,7 @@ impl From<node_fs::sync::WriteFileOptions> for ffi::WriteFileOptions {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncClosure> {
+pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncClosure> {
     Box::new(
         AsyncClosure(
             Arc::new(
@@ -3462,11 +4592,11 @@ pub extern "C" fn fs_async_create_async_closure(on_success: *mut ffi::c_void, on
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn()>(on_success) };
-                        (on_success)();
+                        on_success();
                     }
                 }))
             )
@@ -3475,7 +4605,7 @@ pub extern "C" fn fs_async_create_async_closure(on_success: *mut ffi::c_void, on
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncBoolClosure> {
+pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncBoolClosure> {
     Box::new(
         AsyncBoolClosure(
             Arc::new(
@@ -3483,11 +4613,11 @@ pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut ffi::c_voi
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(bool)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3496,7 +4626,7 @@ pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut ffi::c_voi
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncFileStatClosure> {
+pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileStatClosure> {
     Box::new(
         AsyncFileStatClosure(
             Arc::new(
@@ -3504,11 +4634,11 @@ pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut ffi::
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<ffi::FileStat>)>(on_success) };
-                        (on_success)(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileStat>)>(on_success) };
+                        on_success(Box::new(value.unwrap()));
                     }
                 }))
             )
@@ -3517,7 +4647,7 @@ pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut ffi::
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncStringClosure> {
+pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncStringClosure> {
     Box::new(
         AsyncStringClosure(
             Arc::new(
@@ -3525,11 +4655,11 @@ pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut ffi::c_v
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(String)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3538,7 +4668,7 @@ pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut ffi::c_v
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncUsizeClosure> {
+pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncUsizeClosure> {
     Box::new(
         AsyncUsizeClosure(
             Arc::new(
@@ -3546,11 +4676,11 @@ pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut ffi::c_vo
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(usize)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3559,7 +4689,7 @@ pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut ffi::c_vo
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncI32Closure> {
+pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncI32Closure> {
     Box::new(
         AsyncI32Closure(
             Arc::new(
@@ -3567,11 +4697,11 @@ pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut ffi::c_void
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(i32)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3580,7 +4710,7 @@ pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut ffi::c_void
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncFileWatchClosure> {
+pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileWatchClosure> {
     Box::new(
         AsyncFileWatchClosure(
             Arc::new(
@@ -3588,11 +4718,11 @@ pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut ffi:
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileWatchEvent>)>(on_success) };
-                        (on_success)(Box::new(value.unwrap()));
+                        on_success(Box::new(value.unwrap()));
                     }
                 }))
             )
@@ -3601,7 +4731,7 @@ pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut ffi:
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncFsEncodingClosure> {
+pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFsEncodingClosure> {
     Box::new(
         AsyncFsEncodingClosure(
             Arc::new(
@@ -3609,11 +4739,11 @@ pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut ffi
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FsEncoding>)>(on_success) };
-                        (on_success)(Box::new(value.unwrap()));
+                        on_success(Box::new(value.unwrap()));
                     }
                 }))
             )
@@ -3622,7 +4752,7 @@ pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut ffi
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncWatchClosure> {
+pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncWatchClosure> {
     Box::new(
         AsyncWatchClosure(
             Arc::new(
@@ -3630,11 +4760,11 @@ pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut ffi::c
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<WatchEvent>)>(on_success) };
-                        (on_success)(Box::new(value.unwrap()));
+                        on_success(Box::new(value.unwrap()));
                     }
                 }))
             )
@@ -3643,7 +4773,7 @@ pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut ffi::c
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncReaddirClosure> {
+pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncReaddirClosure> {
     Box::new(
         AsyncReaddirClosure(
             Arc::new(
@@ -3651,11 +4781,11 @@ pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut ffi:
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Vec<ReaddirResult>)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3664,7 +4794,7 @@ pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut ffi:
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncFileDirClosure> {
+pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileDirClosure> {
     Box::new(
         AsyncFileDirClosure(
             Arc::new(
@@ -3672,11 +4802,11 @@ pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut ffi
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileDir>)>(on_success) };
-                        (on_success)(Box::new(value.unwrap()));
+                        on_success(Box::new(value.unwrap()));
                     }
                 }))
             )
@@ -3685,7 +4815,7 @@ pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut ffi
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut ffi::c_void, on_error: *mut ffi::c_void) -> Box<AsyncFileHandleClosure> {
+pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileHandleClosure> {
     Box::new(
         AsyncFileHandleClosure(
             Arc::new(
@@ -3693,11 +4823,11 @@ pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut 
                     if error.is_some() {
                         let on_error = on_error as *const ();
                         let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        (on_error)(Box::new(error.unwrap()));
+                        on_error(Box::new(error.unwrap()));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileHandle>)>(on_success) };
-                        (on_success)(value.unwrap());
+                        on_success(value.unwrap());
                     }
                 }))
             )
@@ -3706,9 +4836,9 @@ pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut 
 }
 
 
-impl From<node_fs::file_stat::FileStat> for ffi::FileStat {
+impl From<node_fs::file_stat::FileStat> for FileStat {
     fn from(value: node_fs::file_stat::FileStat) -> Self {
-        ffi::FileStat {
+        FileStat {
             dev: value.dev,
             ino: value.ino,
             mode: value.mode,
