@@ -8,7 +8,7 @@ name = "nodenative"
 crate-type = ["cdylib"]
 
 [dependencies]
-node-cxx = { path = "../../libs/node-cxx" }
+node-c = { path = "../../libs/node-c" }
 #node-core = {path = "../../libs/node-core"}
 #node-buffer = { path = "../../libs/node-buffer" }
 #node-fs = { path = "../../libs/node-fs" }

@@ -4,8 +4,3 @@ framework module NodeCompat {
   export *
   module * { export * }
 }
-
-module NodeCompat.Swift {
-  header "NodeCompat-Swift.h"
-  requires objc
-}

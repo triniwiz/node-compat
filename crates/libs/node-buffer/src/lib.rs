@@ -1,8 +1,6 @@
-use std::borrow::Cow;
-use std::ffi::{c_void, CString};
-use std::fmt::{Debug, Display, format, Formatter};
+use std::ffi::{c_char, CStr, CString};
+use std::fmt::{Debug, Display, Formatter};
 use std::io::Write;
-use std::str::Utf8Error;
 use std::sync::{Arc};
 use base64::Engine;
 use parking_lot::RwLock;
@@ -110,7 +108,7 @@ pub enum StringEncoding {
     Base64Url,
     Latin1,
     Binary,
-    Hex
+    Hex,
 }
 
 impl TryFrom<i32> for StringEncoding {
@@ -238,6 +236,12 @@ impl Buffer {
         let string = string.to_string_lossy();
         get_bytes(string.as_ref(), encoding)
     }
+
+    fn encode_str(string: &CStr, encoding: StringEncoding) -> Vec<u8> {
+        let string = string.to_string_lossy();
+        get_bytes(string.as_ref(), encoding)
+    }
+
 
     pub fn write_int8(&mut self, value: i8, offset: Option<usize>) {
         let buffer = self.buffer_mut();
@@ -573,8 +577,34 @@ impl Buffer {
         Buffer::from_string(value, StringEncoding::Base64).as_string(Some(StringEncoding::Binary), None, None)
     }
 
+    pub unsafe fn atob_raw(value: *const c_char) -> *const c_char {
+        if value.is_null() {
+            return std::ptr::null();
+        }
+        let value = unsafe { CStr::from_ptr(value) };
+        match CString::new(
+            Buffer::from_str(value, StringEncoding::Base64).as_string(Some(StringEncoding::Binary), None, None)
+        ) {
+            Ok(cstring) => cstring.into_raw(),
+            Err(_) => std::ptr::null()
+        }
+    }
+
     pub fn btoa(value: CString) -> String {
         Buffer::from_string(value, StringEncoding::Utf8).as_string(Some(StringEncoding::Base64), None, None)
+    }
+
+    pub unsafe fn btoa_raw(value: *const c_char) -> *const c_char {
+        if value.is_null() {
+            return std::ptr::null();
+        }
+        let value = unsafe { CStr::from_ptr(value) };
+
+        if let Ok(cstring) = CString::new(Buffer::from_str(value, StringEncoding::Utf8).as_string(Some(StringEncoding::Base64), None, None)) {
+            cstring.into_raw()
+        } else {
+            std::ptr::null()
+        }
     }
 
     pub fn concat(buffers: &[&[u8]], length: Option<usize>) -> Self {
@@ -608,6 +638,47 @@ impl Buffer {
                 )
             )
         ))
+    }
+
+    pub unsafe fn concat_raw(buffers: *const *const u8, buffers_length: *const usize, count: usize, length: Option<usize>) -> Self {
+        unsafe {
+            let array = std::slice::from_raw_parts(buffers, count);
+            let array_lengths = std::slice::from_raw_parts(buffers_length, count);
+
+            let len: usize = match length {
+                Some(len) => len.min(array_lengths.iter().sum()),
+                None => array_lengths.iter().sum(),
+            };
+
+            let mut result = vec![0_u8; len];
+
+            let mut cursor = std::io::Cursor::new(&mut result);
+
+            for (ptr, len) in array.iter().zip(array_lengths) {
+                let buf = std::slice::from_raw_parts(*ptr, *len);
+
+
+                let remaining_length = match length {
+                    Some(len) => len - cursor.position() as usize,
+                    None => usize::MAX - cursor.position() as usize,
+                };
+
+                if remaining_length == 0 {
+                    break;
+                }
+
+                let bytes_to_write = remaining_length.min(buf.len());
+                cursor.write_all(&buf[..bytes_to_write]).unwrap();
+            }
+
+            Buffer(BufferInner::Allocated(
+                Arc::new(
+                    RwLock::new(
+                        result
+                    )
+                )
+            ))
+        }
     }
 
     pub fn from_buffer(value: &Buffer) -> Self {
@@ -682,21 +753,33 @@ impl Buffer {
         )
     }
 
-    pub fn fill(&mut self, string: CString, encoding: Option<StringEncoding>) -> &mut Self {
+    pub fn from_str(value: &CStr, encoding: StringEncoding) -> Self {
+        let buf = Buffer::encode_str(value, encoding);
+        Self(
+            BufferInner::Allocated(
+                Arc::new(
+                    RwLock::new(
+                        buf
+                    )
+                )
+            )
+        )
+    }
+
+    fn fill_bytes(&mut self, bytes: &[u8], encoding: Option<StringEncoding>) -> &mut Self {
         let ret = match encoding.unwrap_or(StringEncoding::Utf8) {
             StringEncoding::Ascii => {
-                let string = string.to_string_lossy();
-                string.as_bytes().to_vec()
+                bytes.to_vec()
             }
             StringEncoding::Utf8 => {
-                string.as_bytes().to_vec()
+                bytes.to_vec()
             }
             StringEncoding::Utf16le => {
-                let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
+                let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(bytes);
                 decoded.as_bytes().to_vec()
             }
             StringEncoding::Ucs2 => {
-                let string = string.as_bytes();
+                let string = bytes;
                 let length = string.len();
                 let string = unsafe { std::slice::from_raw_parts(string.as_ptr() as *const u16, length / 2) };
                 let mut buf = vec![0_u8; length];
@@ -706,19 +789,19 @@ impl Buffer {
             }
             StringEncoding::Base64 => {
                 // todo error
-                base64::engine::general_purpose::STANDARD.decode(string.as_bytes()).unwrap()
+                base64::engine::general_purpose::STANDARD.decode(bytes).unwrap()
             }
             StringEncoding::Base64Url => {
                 // todo error
-                base64::engine::general_purpose::URL_SAFE.decode(string.as_bytes()).unwrap()
+                base64::engine::general_purpose::URL_SAFE.decode(bytes).unwrap()
             }
             StringEncoding::Binary | StringEncoding::Latin1 => {
-                let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(string.as_bytes());
+                let (decoded, _) = encoding_rs::UTF_8.decode_without_bom_handling(bytes);
                 decoded.as_bytes().to_vec()
             }
             StringEncoding::Hex => {
                 // todo error
-                hex::decode(string.as_bytes()).unwrap()
+                hex::decode(bytes).unwrap()
             }
         };
         match self.0 {
@@ -739,6 +822,15 @@ impl Buffer {
             _ => {}
         }
         self
+    }
+
+    pub fn fill(&mut self, string: CString, encoding: Option<StringEncoding>) -> &mut Self {
+        self.fill_bytes(string.as_bytes(), encoding)
+    }
+
+    pub fn fill_str(&mut self, string: &CStr, encoding: Option<StringEncoding>) -> &mut Self {
+        let string = string.to_string_lossy();
+        self.fill_bytes(string.as_bytes(), encoding)
     }
 
     pub fn length(&self) -> usize {
