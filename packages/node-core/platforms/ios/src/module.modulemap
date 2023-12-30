@@ -1,0 +1,4 @@
+module NodeNativeModule {
+    header "NodeNativeModule.h"
+    export *
+}

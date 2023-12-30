@@ -1,6 +1,0 @@
-framework module NodeCompat {
-  umbrella header "NodeCompat.h"
-
-  export *
-  module * { export * }
-}

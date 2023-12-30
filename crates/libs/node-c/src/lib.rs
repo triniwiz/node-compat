@@ -5,7 +5,7 @@ use std::os::fd::RawFd;
 use std::os::raw::{c_int, c_void};
 use std::sync::Arc;
 use node_fs::prelude::{handle_meta};
-use node_core::error::{get_custom_error_message, Result};
+use node_core::error::{AnyError, get_custom_error_message, Result};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -110,6 +110,39 @@ pub enum StringEncoding {
     StringEncodingHex,
 }
 
+impl From<node_buffer::StringEncoding> for StringEncoding {
+    fn from(value: node_buffer::StringEncoding) -> Self {
+        match value {
+            node_buffer::StringEncoding::Ascii => StringEncoding::StringEncodingAscii,
+            node_buffer::StringEncoding::Utf8 => StringEncoding::StringEncodingUtf8,
+            node_buffer::StringEncoding::Utf16le => StringEncoding::StringEncodingUtf16le,
+            node_buffer::StringEncoding::Ucs2 => StringEncoding::StringEncodingUcs2,
+            node_buffer::StringEncoding::Base64 => StringEncoding::StringEncodingBase64,
+            node_buffer::StringEncoding::Base64Url => StringEncoding::StringEncodingBase64Url,
+            node_buffer::StringEncoding::Latin1 => StringEncoding::StringEncodingLatin1,
+            node_buffer::StringEncoding::Binary => StringEncoding::StringEncodingBinary,
+            node_buffer::StringEncoding::Hex => StringEncoding::StringEncodingHex,
+        }
+    }
+}
+
+
+impl Into<node_buffer::StringEncoding> for StringEncoding {
+    fn into(self) -> node_buffer::StringEncoding {
+        match self {
+            StringEncoding::StringEncodingAscii => node_buffer::StringEncoding::Ascii,
+            StringEncoding::StringEncodingUtf8 => node_buffer::StringEncoding::Utf8,
+            StringEncoding::StringEncodingUtf16le => node_buffer::StringEncoding::Utf16le,
+            StringEncoding::StringEncodingUcs2 => node_buffer::StringEncoding::Ucs2,
+            StringEncoding::StringEncodingBase64 => node_buffer::StringEncoding::Base64,
+            StringEncoding::StringEncodingBase64Url => node_buffer::StringEncoding::Base64Url,
+            StringEncoding::StringEncodingLatin1 => node_buffer::StringEncoding::Latin1,
+            StringEncoding::StringEncodingBinary => node_buffer::StringEncoding::Binary,
+            StringEncoding::StringEncodingHex => node_buffer::StringEncoding::Hex
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum FsEncodingType {
@@ -121,11 +154,40 @@ pub enum FsEncodingType {
     FsEncodingTypeBuffer,
 }
 
+
+impl Into<node_fs::FsEncodingType> for FsEncodingType {
+    fn into(self) -> node_fs::FsEncodingType {
+        match self {
+            FsEncodingType::FsEncodingTypeAscii => node_fs::FsEncodingType::Ascii,
+            FsEncodingType::FsEncodingTypeUtf8 => node_fs::FsEncodingType::Utf8,
+            FsEncodingType::FsEncodingTypeUtf16le => node_fs::FsEncodingType::Utf16le,
+            FsEncodingType::FsEncodingTypeUcs2 => node_fs::FsEncodingType::Ucs2,
+            FsEncodingType::FsEncodingTypeLatin1 => node_fs::FsEncodingType::Latin1,
+            FsEncodingType::FsEncodingTypeBuffer => node_fs::FsEncodingType::Buffer,
+        }
+    }
+}
+
+impl From<node_fs::prelude::FsEncodingType> for FsEncodingType {
+    fn from(value: node_fs::prelude::FsEncodingType) -> Self {
+        match value {
+            node_fs::prelude::FsEncodingType::Ascii => FsEncodingType::FsEncodingTypeAscii,
+            node_fs::prelude::FsEncodingType::Utf8 => FsEncodingType::FsEncodingTypeUtf8,
+            node_fs::prelude::FsEncodingType::Utf16le => FsEncodingType::FsEncodingTypeUtf16le,
+            node_fs::prelude::FsEncodingType::Ucs2 => FsEncodingType::FsEncodingTypeUcs2,
+            node_fs::prelude::FsEncodingType::Latin1 => FsEncodingType::FsEncodingTypeLatin1,
+            node_fs::prelude::FsEncodingType::Buffer => FsEncodingType::FsEncodingTypeBuffer
+        }
+    }
+}
+
+
+#[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(crate) enum ReaddirResultType {
-    String,
-    Buffer,
-    Type,
+pub enum ReaddirResultType {
+    ReaddirResultTypeString,
+    ReaddirResultTypeBuffer,
+    ReaddirResultTypeType,
 }
 
 
@@ -160,8 +222,21 @@ pub struct FileStat {
     pub isSymbolicLink: bool,
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn filestat_destroy(file_stat: *mut FileStat) {
+    if file_stat.is_null() {
+        return;
+    }
+    let _ = unsafe { Box::from_raw(file_stat) };
+}
 
 pub struct Error(node_core::error::AnyError);
+
+impl From<node_core::error::AnyError> for Box<Error> {
+    fn from(value: AnyError) -> Self {
+        Box::new(Error(value))
+    }
+}
 
 impl Error {
     pub fn custom_error(clazz: &'static str, message: &'static str) -> Self {
@@ -206,7 +281,13 @@ thread_local!(
 );
 
 /// Set the thread-local `LAST_ERROR` variable.
-pub fn update_last_error<E: Into<Box<Error>> + 'static>(e: E) {}
+pub fn update_last_error<E: Into<Box<Error>> + 'static>(e: E) {
+    let boxed = e.into();
+
+    LAST_ERROR.with(|last| {
+        *last.borrow_mut() = Some(boxed);
+    });
+}
 
 /// Get the last error, clearing the variable in the process.
 pub fn get_last_error() -> Option<Box<Error>> {
@@ -252,13 +333,22 @@ pub unsafe extern "C" fn node_error_message(buffer: *mut c_char, length: libc::c
         let rest = &mut buffer[data.len()..];
         std::ptr::write_bytes(rest.as_mut_ptr(), 0, rest.len());
 
-        data.len() as libc::c_int
+        return data.len() as libc::c_int;
     }
     0
 }
 
 #[derive(Clone)]
 pub struct Buffer(node_buffer::Buffer);
+
+#[no_mangle]
+pub extern "C" fn buffer_destroy(buffer: *mut Buffer) {
+    if buffer.is_null() {
+        return;
+    }
+
+    let _ = unsafe { Box::from_raw(buffer) };
+}
 
 impl Buffer {
     pub(crate) fn new(buffer: node_buffer::Buffer) -> Self {
@@ -289,11 +379,12 @@ pub extern "C" fn buffer_alloc(size: usize) -> *mut Buffer {
 
 #[no_mangle]
 pub extern "C" fn buffer_alloc_with_size_string_encoding(size: usize, string: *const c_char, encoding: StringEncoding) -> *mut Buffer {
+    let string = unsafe { CStr::from_ptr(string) };
     Box::into_raw(
         Box::new(
             Buffer(node_buffer::Buffer::builder()
                 .size(size)
-                .fill_text(CString::new(string).unwrap(), encoding.into())
+                .fill_text(CString::from(string), encoding.into())
                 .build())
         )
     )
@@ -843,7 +934,7 @@ pub extern "C" fn fs_encoding_get_buffer_value(encoding: *const FsEncoding) -> *
         }
         Err(err) => {
             update_last_error(err);
-            std::ptr::null()
+            std::ptr::null_mut()
         }
     }
 }
@@ -1057,9 +1148,9 @@ pub struct ReaddirResult(node_fs::sync::ReaddirResult);
 impl ReaddirResult {
     pub fn get_type(&self) -> ReaddirResultType {
         match &self.0 {
-            node_fs::sync::ReaddirResult::String(_) => ReaddirResultType::String,
-            node_fs::sync::ReaddirResult::Buffer(_) => ReaddirResultType::Buffer,
-            node_fs::sync::ReaddirResult::Type(_) => ReaddirResultType::Type
+            node_fs::sync::ReaddirResult::String(_) => ReaddirResultType::ReaddirResultTypeString,
+            node_fs::sync::ReaddirResult::Buffer(_) => ReaddirResultType::ReaddirResultTypeBuffer,
+            node_fs::sync::ReaddirResult::Type(_) => ReaddirResultType::ReaddirResultTypeType
         }
     }
 
@@ -1575,25 +1666,47 @@ pub extern "C" fn fs_read_sync(
 }
 
 
-/*
+#[repr(C)]
+pub struct ReaddirResultArray {
+    data: *mut ReaddirResult,
+    length: usize,
+}
+
 #[no_mangle]
-pub extern "C" fn fs_readdir_sync(path: *const c_char, options: ReaddirOptions) -> Result<Vec<ReaddirResult>> {
+pub extern "C" fn fs_readdir_sync(path: *const c_char, options: ReaddirOptions) -> *mut ReaddirResultArray {
     if path.is_null() {
-        return;
+        return std::ptr::null_mut();
     }
     let path = unsafe { CStr::from_ptr(path) };
     let path = path.to_string_lossy();
 
-    node_fs::sync::readdir(path, options.into())
+    match node_fs::sync::readdir(path.as_ref(), options.into())
         .map(|mut value| {
             value.into_iter()
                 .map(|value| ReaddirResult(value))
-                .collect()
+                .collect::<Vec<ReaddirResult>>()
         })
-        .map_err(|e| node_core::error::error_from_io_error(e))
+        .map_err(|e| node_core::error::error_from_io_error(e)) {
+        Ok(mut result) => {
+            let ptr = result.as_mut_ptr();
+            let len = result.len();
+            result.shrink_to_fit();
+            std::mem::forget(result);
+            let ret = ReaddirResultArray {
+                data: ptr,
+                length: len,
+            };
+            Box::into_raw(
+                Box::new(ret)
+            )
+        }
+        Err(err) => {
+            update_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
-*/
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct FsEncoding(node_fs::FsEncoding);
@@ -1693,8 +1806,8 @@ pub extern "C" fn fs_readv_sync(fd: i32, buffers: *mut *mut Buffer, length: usiz
 }
 
 #[no_mangle]
-pub extern "C" fn fs_readv_sync_slice(fd: i32, buffers: *const *mut u8, length: usize, buffers_buffers: *const usize, buffers_buffers_length: usize, position: i64) -> usize {
-    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, buffers_buffers_length) };
+pub extern "C" fn fs_readv_sync_slice(fd: i32, buffers: *const *mut u8, buffers_buffers: *const usize, length: usize, position: i64) -> usize {
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, length) };
     let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
 
     let mut buffers = buffers.iter().zip(buffer_length.iter())
@@ -2009,8 +2122,8 @@ pub extern "C" fn fs_writev_sync(fd: i32, buffers: *mut *mut Buffer, length: usi
 
 
 #[no_mangle]
-pub extern "C" fn fs_writev_sync_slice(fd: i32, buffers: *const *const u8, length: usize, buffers_buffers: *const usize, buffers_buffers_length: usize, position: i64) -> usize {
-    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, buffers_buffers_length) };
+pub extern "C" fn fs_writev_sync_slice(fd: i32, buffers: *const *const u8, buffers_buffers: *const usize, length: usize, position: i64) -> usize {
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, length) };
     let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
 
     let buffers = buffers.iter().zip(buffer_length.iter())
@@ -2291,7 +2404,7 @@ pub extern "C" fn fs_async_copy_file(src: *const c_char, dest: *const c_char, fl
 pub extern "C" fn fs_async_cp(_src: *const c_char, _dest: *const c_char) {}
 
 #[no_mangle]
-pub extern "C" fn fs_async_exists(path: *const c_char, callback: &AsyncBoolClosure) {
+pub extern "C" fn fs_async_exists(path: *const c_char, callback: *const AsyncBoolClosure) {
     if path.is_null() || callback.is_null() {
         return;
     }
@@ -2909,7 +3022,7 @@ pub extern "C" fn fs_async_readv(
         }))
     );
 
-    let buffers = buffers.into_iter().map(|buffer| buffer.0).collect::<Vec<node_buffer::Buffer>>();
+    let buffers = buffers.into_iter().map(|buffer| buffer.0.clone()).collect::<Vec<node_buffer::Buffer>>();
 
     node_fs::a_sync::readv(fd, buffers, position.try_into().unwrap(), cb)
 }
@@ -2958,7 +3071,7 @@ pub extern "C" fn fs_async_rename(old_path: *const c_char, new_path: *const c_ch
 
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
-        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
@@ -2989,7 +3102,7 @@ pub extern "C" fn fs_async_rmdir(
 
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
-        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
@@ -3847,6 +3960,7 @@ pub extern "C" fn fs_handle_chown(handle: *mut FileHandle, uid: u32, gid: u32, c
     )
 }
 
+// consumes the handle, do not use after closing
 #[no_mangle]
 pub extern "C" fn fs_handle_close(handle: *mut FileHandle, callback: *const AsyncClosure) {
     if handle.is_null() || callback.is_null() {
@@ -3855,7 +3969,7 @@ pub extern "C" fn fs_handle_close(handle: *mut FileHandle, callback: *const Asyn
 
     let callback = unsafe { &*callback };
 
-    let handle = unsafe { &mut *handle };
+    let handle = unsafe { Box::from_raw(handle) };
 
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
@@ -3870,6 +3984,7 @@ pub extern "C" fn fs_handle_close(handle: *mut FileHandle, callback: *const Asyn
             }
         }))
     );
+
 
     handle.0.close(
         cb

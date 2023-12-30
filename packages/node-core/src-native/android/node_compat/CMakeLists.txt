@@ -29,66 +29,32 @@ elseif ("${ANDROID_ABI}" MATCHES "x86$")
   set(RUST_BUILD_TARGET "i686-linux-android")
 endif ()
 
-get_filename_component(PROJECT_ROOT_DIR ${PROJECT_SOURCE_DIR}/../../../../.. REALPATH)
-
-get_filename_component(PROJECT_NATIVE_ROOT_DIR ${PROJECT_ROOT_DIR}/.. DIRECTORY)
-
-
-MESSAGE("# NEW_PATH: " ${PROJECT_NATIVE_ROOT_DIR})
-
-#set(PROJECT_NATIVE_ROOT_DIR ${PROJECT_NATIVE_ROOT_DIR})
-
-
-set(CARGO_MANIFEST ${PROJECT_NATIVE_ROOT_DIR}/Cargo.toml)
-set(CARGO_TARGET_DIR ${PROJECT_NATIVE_ROOT_DIR}/target)
-set(CURRENT_TARGET_DIR ${CARGO_TARGET_DIR}/${RUST_BUILD_TARGET})
-
-
-set(NODE_ANDROID_SOURCE_FILE ${PROJECT_NATIVE_ROOT_DIR}/crates/libs/node-cxx/src/lib.rs)
-set(NODE_ANDROID_BRIDGE_CPP ${CARGO_TARGET_DIR}/cxxbridge/node-cxx/src/lib.rs.cc)
 
 set(COMMON_CMAKE_ARGUMENTS "-std=c++17 -pthread -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -DV8_31BIT_SMIS_ON_64BIT_ARCH")
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(RUST_BUILD_TYPE)
-  set(NODE_ANDROID_LIB ${CURRENT_TARGET_DIR}/debug)
-else ()
-  set(RUST_BUILD_TYPE --release)
-  set(NODE_ANDROID_LIB ${CURRENT_TARGET_DIR}/release)
-  set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -O3")
-endif ()
-
-
-set(NODE_ANDROID_LIB ${NODE_ANDROID_LIB}/${CMAKE_STATIC_LIBRARY_PREFIX}nodenative${CMAKE_SHARED_LIBRARY_SUFFIX})
 
 if ("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
   # Enable pointer compression on 64 bit platforms
   set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -DV8_COMPRESS_POINTERS")
 endif ()
 
+set(CPP_DIR ../../../platforms/ios/src/cpp)
+
 include_directories(
         nodenativev8
 
         PUBLIC
 
-        ${CARGO_TARGET_DIR}/cxxbridge
-
         ${PROJECT_SOURCE_DIR}/src/main/cpp/include/libc++
         ${PROJECT_SOURCE_DIR}/src/main/cpp/include
         ${PROJECT_SOURCE_DIR}/src/main/cpp
+        ${PROJECT_SOURCE_DIR}/src/main/cpp/nodenative
+        ${PROJECT_SOURCE_DIR}/src/main/cpp/nodenative/include
+        ${CPP_DIR}
+        ${CPP_DIR}/include
 )
 
 set(CMAKE_CXX_FLAGS ${COMMON_CMAKE_ARGUMENTS})
-
-# Add a custom command that builds the rust crate and generates C++ bridge code
-add_custom_command(
-        OUTPUT ${NODE_ANDROID_BRIDGE_CPP} ${NODE_ANDROID_LIB}
-        #COMMAND cargo +nightly build -Z build-std='std,panic_abort' -Z build-std-features='panic_immediate_abort' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
-        COMMAND cargo +nightly build -Z build-std='std' --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-android
-        # COMMAND cargo build --manifest-path ${CARGO_MANIFEST} --target ${RUST_BUILD_TARGET} ${RUST_BUILD_TYPE} -p node-cxx
-        DEPENDS ${NODE_ANDROID_SOURCE_FILE}
-        USES_TERMINAL
-)
 
 
 add_library(
@@ -96,16 +62,16 @@ add_library(
 
         SHARED
 
-        src/main/cpp/rust/cxx.cc
-        src/main/cpp/NodeCompatImpl.cpp
-        src/main/cpp/BufferImpl.cpp
-        src/main/cpp/Caches.cpp
-        src/main/cpp/Helpers.cpp
-        src/main/cpp/Bridge.cpp
-        src/main/cpp/FSImpl.cpp
-        src/main/cpp/FileDirImpl.cpp
-        src/main/cpp/FileDirentImpl.cpp
-        src/main/cpp/FileHandleImpl.cpp
+        ${CPP_DIR}/NodeCompatImpl.cpp
+        ${CPP_DIR}/BufferImpl.cpp
+        ${CPP_DIR}/Caches.cpp
+        ${CPP_DIR}/Helpers.cpp
+        ${CPP_DIR}/Bridge.cpp
+        ${CPP_DIR}/FSImpl.cpp
+        ${CPP_DIR}/FileDirImpl.cpp
+        ${CPP_DIR}/FileDirentImpl.cpp
+        ${CPP_DIR}/FileHandleImpl.cpp
+        ${CPP_DIR}/NodeNativeJSIModule.cpp
 
         ${NODE_ANDROID_BRIDGE_CPP}
 )
@@ -119,24 +85,6 @@ set_target_properties(
         LINK_FLAGS -Wl,--allow-multiple-definition
 )
 
-
-MESSAGE("# General cmake Info")
-MESSAGE("# PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
-MESSAGE("# CMAKE_VERSION: " ${CMAKE_VERSION})
-MESSAGE("# CMAKE_C_COMPILER_ID: " ${CMAKE_C_COMPILER_ID})
-MESSAGE("# CMAKE_CXX_COMPILER_ID: " ${CMAKE_CXX_COMPILER_ID})
-MESSAGE("# CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS})
-MESSAGE("# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
-
-MESSAGE("# CARGO_MANIFEST: " ${CARGO_MANIFEST})
-MESSAGE("# CARGO_TARGET_DIR: " ${CARGO_TARGET_DIR})
-MESSAGE("# CURRENT_TARGET_DIR: " ${CURRENT_TARGET_DIR})
-MESSAGE("# NODE_ANDROID_SOURCE_FILE: " ${NODE_ANDROID_SOURCE_FILE})
-MESSAGE("# NODE_ANDROID_BRIDGE_CPP: " ${NODE_ANDROID_BRIDGE_CPP})
-MESSAGE("# ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
-MESSAGE("# NODE_ANDROID_LIB: " ${NODE_ANDROID_LIB})
-MESSAGE("# PROJECT_ROOT_DIR: " ${PROJECT_ROOT_DIR})
-MESSAGE("# PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
 
 find_library(system-log log)
 find_library(system-z z)
@@ -170,14 +118,7 @@ target_link_libraries(nodenativev8
         ${system-log}
         ${system-z}
         ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libNativeScript.so
+        ${PROJECT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}/libnodenative.so
         ${NODE_ANDROID_LIB}
         android
-        )
-
-
-add_custom_command(TARGET nodenativev8
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${NODE_ANDROID_LIB}
-        ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libnodenative.so
         )

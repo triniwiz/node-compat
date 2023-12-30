@@ -1,16 +1,16 @@
 import { Buffer } from '@nativescript/node-buffer';
 
 export interface IFileStat {
-  dev: number | BigInt;
-  ino: number | BigInt;
+  dev: number | bigint;
+  ino: number | bigint;
   mode: number;
-  nlink: number | BigInt;
+  nlink: number | bigint;
   uid: number;
   gid: number;
-  rdev: number | BigInt;
-  size: number | BigInt;
-  blksize: number | BigInt;
-  blocks: number | BigInt;
+  rdev: number | bigint;
+  size: number | bigint;
+  blksize: number | bigint;
+  blocks: number | bigint;
   atimeMs: number;
   mtimeMs: number;
   ctimeMs: number;
@@ -83,7 +83,7 @@ function parseFlags(flags: string) {
 }
 
 class Fs {
-  static accessSync(path: string | Buffer, mode: number = 0) {
+  static accessSync(path: string | Buffer, mode = 0) {
     if (path instanceof Buffer) {
       path = path.toString('utf-8');
     } else {
@@ -137,7 +137,7 @@ class Fs {
     return NSCFS.closeSync(fd);
   }
 
-  static copyFileSync(src: string | Buffer | URL, dest: string | Buffer | URL, mode: number = 0) {
+  static copyFileSync(src: string | Buffer | URL, dest: string | Buffer | URL, mode = 0) {
     if (src instanceof Buffer) {
       src = src.toString('utf-8');
     } else {
@@ -193,7 +193,7 @@ class Fs {
     return NSCFS.fstatSync(fd);
   }
 
-  static lchmodSync(path: string | Buffer | URL, mode: number = 0) {
+  static lchmodSync(path: string | Buffer | URL, mode = 0) {
     if (path instanceof Buffer) {
       path = path.toString('utf-8');
     } else {
@@ -314,7 +314,7 @@ class Fs {
     return NSCFS.readlinkSync(path, options);
   }
 
-  static readSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | BigInt): number {
+  static readSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | bigint): number {
     return NSCFS.readSync(fd, buffer, (offset = 0), (length = -1), position ?? 0);
   }
 

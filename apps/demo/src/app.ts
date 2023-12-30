@@ -12,8 +12,6 @@ console.time('from');
 const buffer = Buffer.from('hello world', 'utf8');
 console.timeEnd('from');
 
-console.dir(buffer);
-
 console.time('from');
 const a = b.Buffer.from('hello world', 'utf8');
 console.timeEnd('from');
@@ -127,19 +125,24 @@ const hello = path.join(knownFolders.currentApp().path + '/documents/hello.txt')
 //   console.log(error);
 // }
 
-try {
-  const file = new java.io.File(hello);
-  // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_WRITE | android.os.ParcelFileDescriptor.MODE_APPEND);
-  // const fd = pfd.detachFd();
-  console.time('appendFileSync');
-  fs.appendFileSync(hello, ' data to append', { flag: 'a' });
-  console.timeEnd('appendFileSync');
-  console.log('The "data to append" was appended to file!');
-} catch (err) {
-  console.log(err);
-  /* Handle the error */
+if (global.isAndroid) {
+  try {
+    const file = new java.io.File(hello);
+    // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_WRITE | android.os.ParcelFileDescriptor.MODE_APPEND);
+    // const fd = pfd.detachFd();
+  } catch (err) {
+    console.log(err);
+    /* Handle the error */
+  }
 }
 
+if (global.isIOS) {
+}
+
+console.time('appendFileSync');
+fs.appendFileSync(hello, ' data to append', { flag: 'a' });
+console.timeEnd('appendFileSync');
+console.log('The "data to append" was appended to file!');
 // try {
 //   const file = new java.io.File(hello);
 //   const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
@@ -153,11 +156,20 @@ try {
 //   /* Handle the error */
 // }
 
-try {
+let absolutePath;
+if (global.isAndroid) {
   const file = new java.io.File(hello);
+  absolutePath = file.getAbsolutePath();
+}
 
+if (global.isIOS) {
+  const file = NSURL.URLWithString(hello);
+  absolutePath = file.absoluteString;
+}
+
+try {
   console.time('statSync');
-  const stat = fs.statSync(file.getAbsolutePath(), { bigint: true });
+  const stat = fs.statSync(absolutePath, { bigint: true });
   console.timeEnd('statSync');
   console.log(
     'statSync ',
