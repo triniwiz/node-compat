@@ -8,4 +8,4 @@ name = "nodenative"
 crate-type = ["staticlib"]
 
 [dependencies]
-node-cxx = { path = "../../libs/node-cxx" }
+node-c = { path = "../../libs/node-c" }

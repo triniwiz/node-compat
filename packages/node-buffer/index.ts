@@ -60,7 +60,7 @@ export class Buffer {
     return buf;
   }
 
-  static copyBytesFrom(view: TypedArray, offset: number = 0, length: number = -1) {
+  static copyBytesFrom(view: TypedArray, offset = 0, length = -1) {
     return NSCBuffer.copyBytesFrom(view, offset, length);
   }
 
@@ -123,7 +123,7 @@ export class Buffer {
     return this._length;
   }
 
-  toString(encoding: StringEncoding = undefined, start: number = 0, end: number = -1) {
+  toString(encoding: StringEncoding = undefined, start = 0, end = -1) {
     if (arguments.length === 0) {
       return this._native.toString();
     }
@@ -186,19 +186,19 @@ export class Buffer {
     return this._native.writeDoubleBE(value, offset);
   }
 
-  writeBigInt64LE(value: BigInt, offset: number) {
+  writeBigInt64LE(value: bigint, offset: number) {
     return this._native.writeBigInt64LE(value, offset);
   }
 
-  writeBigInt64BE(value: BigInt, offset: number) {
+  writeBigInt64BE(value: bigint, offset: number) {
     return this._native.writeBigInt64BE(value, offset);
   }
 
-  writeBigUInt64LE(value: BigInt, offset: number) {
+  writeBigUInt64LE(value: bigint, offset: number) {
     return this._native.writeBigUInt64LE(value, offset);
   }
 
-  writeBigUInt64BE(value: BigInt, offset: number) {
+  writeBigUInt64BE(value: bigint, offset: number) {
     return this._native.writeBigUInt64BE(value, offset);
   }
 
@@ -258,19 +258,19 @@ export class Buffer {
     return this._native.readDoubleBE(offset);
   }
 
-  readBigInt64LE(offset: number): BigInt {
+  readBigInt64LE(offset: number): bigint {
     return this._native.readBigInt64LE(offset);
   }
 
-  readBigInt64BE(offset: number): BigInt {
+  readBigInt64BE(offset: number): bigint {
     return this._native.readBigInt64BE(offset);
   }
 
-  readBigUInt64LE(offset: number): BigInt {
+  readBigUInt64LE(offset: number): bigint {
     return this._native.readBigUInt64LE(offset);
   }
 
-  readBigUInt64BE(offset: number): BigInt {
+  readBigUInt64BE(offset: number): bigint {
     return this._native.readBigUInt64BE(offset);
   }
 }

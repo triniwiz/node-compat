@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::io::ErrorKind;
 
 /// A simple error type that lets the creator specify both the error message and
 /// the error class name. This type is private; externally it only ever appears

@@ -49,13 +49,13 @@ declare class NSCBuffer {
 
   writeDoubleBE(value: number, offset: number);
 
-  writeBigInt64LE(value: BigInt, offset: number);
+  writeBigInt64LE(value: bigint, offset: number);
 
-  writeBigInt64BE(value: BigInt, offset: number);
+  writeBigInt64BE(value: bigint, offset: number);
 
-  writeBigUInt64LE(value: BigInt, offset: number);
+  writeBigUInt64LE(value: bigint, offset: number);
 
-  writeBigUInt64BE(value: BigInt, offset: number);
+  writeBigUInt64BE(value: bigInt, offset: number);
 
   readInt8(offset: number): number;
 
@@ -85,13 +85,13 @@ declare class NSCBuffer {
 
   readDoubleBE(offset: number): number;
 
-  readBigInt64LE(offset: number): BigInt;
+  readBigInt64LE(offset: number): bigint;
 
-  readBigInt64BE(offset: number): BigInt;
+  readBigInt64BE(offset: number): bigint;
 
-  readBigUInt64LE(offset: number): BigInt;
+  readBigUInt64LE(offset: number): bigint;
 
-  readBigUInt64BE(offset: number): BigInt;
+  readBigUInt64BE(offset: number): bigint;
 }
 declare global {
   NSCBuffer;
