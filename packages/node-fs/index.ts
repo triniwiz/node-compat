@@ -1,3 +1,5 @@
+require('@nativescript/node-core');
+
 import { Buffer } from '@nativescript/node-buffer';
 
 export interface IFileStat {
@@ -477,6 +479,15 @@ class Fs {
   static writevSync(fd: number, buffers: ArrayBufferView[], position?: number): number {
     return NSCFS.writevSync(fd, buffers, position ?? 0);
   }
+
+  static open(path: string | Buffer | URL, flags: string | number, mode: string | number, callback: (error: Error, fd: number) => void) {
+    if (path instanceof Buffer) {
+      path = path.toString('utf-8');
+    } else if (typeof path !== 'number') {
+      path = path.toString();
+    }
+    NSCFS.open(path, flags ?? 'r', mode ?? 0o666, callback);
+  }
 }
 
 export const accessSync = Fs.accessSync;
@@ -517,3 +528,5 @@ export const utimesSync = Fs.utimesSync;
 export const writeFileSync = Fs.writeFileSync;
 export const writeSync = Fs.writeSync;
 export const writevSync = Fs.writevSync;
+
+export const open = Fs.open;

@@ -77,6 +77,8 @@ declare class NSCFS {
 
   static openSync(path: string | NSCBuffer | URL, flags: string | number, mode: number): number;
 
+  static open(path: string | NSCBuffer | URL, flags: string | number, mode: string | number, callback: (error: Error, fd: number) => void);
+
   static readdirSync(
     path: string | NSCBuffer | URL,
     options?: {

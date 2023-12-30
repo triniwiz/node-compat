@@ -222,6 +222,16 @@ pub struct FileStat {
     pub isSymbolicLink: bool,
 }
 
+
+#[no_mangle]
+pub unsafe extern "C" fn node_string_destroy(string: *mut c_char) {
+    if string.is_null() {
+        return;
+    }
+    let _ = unsafe { CString::from_raw(string) };
+}
+
+
 #[no_mangle]
 pub unsafe extern "C" fn filestat_destroy(file_stat: *mut FileStat) {
     if file_stat.is_null() {
@@ -231,6 +241,28 @@ pub unsafe extern "C" fn filestat_destroy(file_stat: *mut FileStat) {
 }
 
 pub struct Error(node_core::error::AnyError);
+
+
+#[no_mangle]
+pub unsafe extern "C" fn node_error_get_clazz(error: *const Error) -> *const c_char {
+    if error.is_null() {
+        return std::ptr::null();
+    }
+    let error = unsafe { &*error };
+    let message = error.clazz();
+    CString::new(message.to_string()).unwrap().into_raw()
+}
+
+
+#[no_mangle]
+pub unsafe extern "C" fn node_error_get_message(error: *const Error) -> *const c_char {
+    if error.is_null() {
+        return std::ptr::null();
+    }
+    let error = unsafe { &*error };
+    let message = error.message();
+    CString::new(message.to_string()).unwrap().into_raw()
+}
 
 impl From<node_core::error::AnyError> for Box<Error> {
     fn from(value: AnyError) -> Self {
@@ -4699,15 +4731,15 @@ impl From<node_fs::sync::WriteFileOptions> for WriteFileOptions {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncClosure {
+    Box::into_raw(Box::new(
         AsyncClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn()>(on_success) };
@@ -4716,19 +4748,19 @@ pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_erro
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncBoolClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncBoolClosure {
+    Box::into_raw(Box::new(
         AsyncBoolClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(bool)>(on_success) };
@@ -4737,61 +4769,61 @@ pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileStatClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileStatClosure {
+    Box::into_raw(Box::new(
         AsyncFileStatClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileStat>)>(on_success) };
-                        on_success(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileStat)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncStringClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncStringClosure {
+    Box::into_raw(Box::new(
         AsyncStringClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(String)>(on_success) };
-                        on_success(value.unwrap());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*const c_char)>(on_success) };
+                        on_success(CString::new(value.unwrap()).unwrap().into_raw());
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncUsizeClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncUsizeClosure {
+    Box::into_raw(Box::new(
         AsyncUsizeClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(usize)>(on_success) };
@@ -4800,19 +4832,19 @@ pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, o
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncI32Closure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncI32Closure {
+    Box::into_raw(Box::new(
         AsyncI32Closure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
                         let on_success = unsafe { std::mem::transmute::<*const (), fn(i32)>(on_success) };
@@ -4821,133 +4853,149 @@ pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileWatchClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileWatchClosure {
+    Box::into_raw(Box::new(
         AsyncFileWatchClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileWatchEvent>)>(on_success) };
-                        on_success(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileWatchEvent)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFsEncodingClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFsEncodingClosure {
+    Box::into_raw(Box::new(
         AsyncFsEncodingClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FsEncoding>)>(on_success) };
-                        on_success(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FsEncoding)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncWatchClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncWatchClosure {
+    Box::into_raw(Box::new(
         AsyncWatchClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<WatchEvent>)>(on_success) };
-                        on_success(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut WatchEvent)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncReaddirClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncReaddirClosure {
+    Box::into_raw(Box::new(
         AsyncReaddirClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Vec<ReaddirResult>)>(on_success) };
-                        on_success(value.unwrap());
+
+
+                        let mut result = value.unwrap();
+
+                        let ptr = result.as_mut_ptr();
+                        let len = result.len();
+                        result.shrink_to_fit();
+                        std::mem::forget(result);
+                        let ret = ReaddirResultArray {
+                            data: ptr,
+                            length: len,
+                        };
+
+
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut ReaddirResultArray)>(on_success) };
+                        on_success(Box::into_raw(
+                            Box::new(ret)
+                        ));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileDirClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileDirClosure {
+    Box::into_raw(Box::new(
         AsyncFileDirClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileDir>)>(on_success) };
-                        on_success(Box::new(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileDir)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void) -> Box<AsyncFileHandleClosure> {
-    Box::new(
+pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileHandleClosure {
+    Box::into_raw(Box::new(
         AsyncFileHandleClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(Box<Error>)>(on_error) };
-                        on_error(Box::new(error.unwrap()));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())));
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(Box<FileHandle>)>(on_success) };
-                        on_success(value.unwrap());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileHandle)>(on_success) };
+                        on_success(Box::into_raw(value.unwrap()));
                     }
                 }))
             )
         )
-    )
+    ))
 }
 
 

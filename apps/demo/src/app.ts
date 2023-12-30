@@ -1,7 +1,5 @@
 import { Application, knownFolders, path } from '@nativescript/core';
 
-require('@nativescript/node-core');
-
 import * as fs from '@nativescript/node-fs';
 
 import { Buffer } from '@nativescript/node-buffer';
@@ -90,8 +88,6 @@ try {
 } catch (error) {
   console.log(error);
 }
-
-console.dir();
 
 // try {
 //   const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
@@ -194,5 +190,9 @@ try {
   console.log(err);
   /* Handle the error */
 }
+
+fs.open(hello, null, null, (error, fd) => {
+  console.log(error, fd);
+});
 
 Application.run({ moduleName: 'app-root' });

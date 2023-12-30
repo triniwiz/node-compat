@@ -61,6 +61,8 @@ typedef struct AsyncWatchClosure AsyncWatchClosure;
 
 typedef struct Buffer Buffer;
 
+typedef struct Error Error;
+
 typedef struct FileDir FileDir;
 
 typedef struct FileDirent FileDirent;
@@ -169,7 +171,13 @@ typedef struct WriteFileOptions {
   int32_t flag;
 } WriteFileOptions;
 
+void node_string_destroy(char *string);
+
 void filestat_destroy(struct FileStat *file_stat);
+
+const char *node_error_get_clazz(const struct Error *error);
+
+const char *node_error_get_message(const struct Error *error);
 
 /**
  * Write the latest error message to a buffer.

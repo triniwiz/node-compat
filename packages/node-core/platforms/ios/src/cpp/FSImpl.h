@@ -91,7 +91,6 @@ public:
 
     static void WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-
     static void Open(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
