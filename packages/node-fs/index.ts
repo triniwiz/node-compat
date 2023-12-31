@@ -317,7 +317,7 @@ class Fs {
   }
 
   static readSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | bigint): number {
-    return NSCFS.readSync(fd, buffer, offset ?? 0, length ?? buffer.length, position ?? -1);
+    return NSCFS.readSync(fd, buffer, offset ?? 0, length ?? (buffer as any)?.length, position ?? -1);
   }
 
   static readvSync(fd: number, buffers: ArrayBufferView[], position?: number): number {

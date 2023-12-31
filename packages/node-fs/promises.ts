@@ -83,7 +83,7 @@ export class FileHandle {
 
   read(buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | bigint) {
     return new Promise((resolve, reject) => {
-      this._native.read(buffer, offset ?? 0, length ?? buffer.length, position ?? -1, (error, read) => {
+      this._native.read(buffer, offset ?? 0, length ?? (buffer as any)?.length, position ?? -1, (error, read) => {
         if (error) {
           reject(error);
         } else {
