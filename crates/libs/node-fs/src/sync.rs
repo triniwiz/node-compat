@@ -129,9 +129,9 @@ pub fn access(path: &str, access: c_int) -> io::Result<()> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct AppendFileOptions {
-    encoding: StringEncoding,
-    mode: i32,
-    flag: i32,
+    pub encoding: StringEncoding,
+    pub mode: i32,
+    pub flag: i32,
 }
 
 impl Default for AppendFileOptions {

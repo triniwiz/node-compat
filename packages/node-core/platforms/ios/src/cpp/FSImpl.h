@@ -95,6 +95,85 @@ public:
 
     static void OpenHandle(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+
+    static void Access(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void AppendFile(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Chmod(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Chown(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Exists(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Fchmod(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Fchown(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Fdatasync(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void FStat(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void CopyFile(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Cp(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Lchmod(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Lchown(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Lutimes(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Link(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Mkdir(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Mkdtemp(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void OpenDir(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Readdir(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadFile(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void ReadLink(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Read(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Readv(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Realpath(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Rename(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Rmdir(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Rm(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Stat(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Statfs(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Symlink(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Truncate(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Unlink(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Utimes(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void WriteFile(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Writev(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void Watch(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    static void WatchFile(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 };
 
 

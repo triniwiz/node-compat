@@ -7,6 +7,7 @@
 
 #include "Common.h"
 #include "Helpers.h"
+
 class BufferImpl {
 private:
     Buffer *buffer_;

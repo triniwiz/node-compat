@@ -1,8 +1,9 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ffi::{c_void, CString, OsString};
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Write};
 use std::os::raw::c_longlong;
 #[cfg(unix)]
 use std::os::unix::prelude::*;
@@ -232,6 +233,52 @@ pub fn append_file_with_path_bytes(
         }
     });
 }
+
+pub fn append_file_with_buffer_string(
+    dest: &mut Buffer,
+    data: &str,
+    options: AppendFileOptions,
+    callback: Arc<AsyncClosure<(), Error>>,
+) {
+    let mut dest = dest.clone();
+    let data = data.to_string();
+    let _ = node_core::thread::spawn(move || {
+        let mut dest = dest.buffer_mut();
+        let buffer = Buffer::from_string(CString::new(data).unwrap(), options.encoding);
+        match dest.write(buffer.buffer()).map(|_| ()) {
+            Ok(_) => {
+                callback.on_success(None);
+            }
+            Err(error) => {
+                callback.on_error(Some(error));
+            }
+        }
+    });
+}
+
+
+pub fn append_file_with_buffer_buffer(
+    dest: &mut Buffer,
+    data: &Buffer,
+    options: AppendFileOptions,
+    callback: Arc<AsyncClosure<(), Error>>,
+) {
+    let mut dest = dest.clone();
+    let data = data.clone();
+    let _ = node_core::thread::spawn(move || {
+        let mut dest = dest.buffer_mut();
+        let data = data.buffer();
+        match dest.write(data).map(|_| ()) {
+            Ok(_) => {
+                callback.on_success(None);
+            }
+            Err(error) => {
+                callback.on_error(Some(error));
+            }
+        }
+    });
+}
+
 
 pub fn chmod(path: &str, mode: c_uint, callback: Arc<AsyncClosure<(), Error>>) {
     let path = path.to_string();

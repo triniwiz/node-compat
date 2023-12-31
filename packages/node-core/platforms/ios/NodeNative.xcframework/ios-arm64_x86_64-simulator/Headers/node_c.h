@@ -105,6 +105,11 @@ typedef struct FileStat {
   bool isSymbolicLink;
 } FileStat;
 
+typedef struct ReaddirResultArray {
+  struct ReaddirResult *data;
+  uintptr_t length;
+} ReaddirResultArray;
+
 typedef struct AppendFileOptions {
   enum StringEncoding encoding;
   int32_t mode;
@@ -125,11 +130,6 @@ typedef struct OpenDirOptions {
   uintptr_t buffer_size;
   bool recursive;
 } OpenDirOptions;
-
-typedef struct ReaddirResultArray {
-  struct ReaddirResult *data;
-  uintptr_t length;
-} ReaddirResultArray;
 
 typedef struct ReaddirOptions {
   bool with_file_types;
@@ -195,6 +195,12 @@ void node_error_destroy(struct NodeError *error);
  * isn't big enough or a `null` pointer was passed in, you'll get a `-1`.
  */
 int node_error_message(char *buffer, int length);
+
+/**
+ * Calculate the number of bytes in the last error's error message **not**
+ * including any trailing `null` characters.
+ */
+int node_last_error_length(void);
 
 void buffer_destroy(struct Buffer *buffer);
 
@@ -342,6 +348,15 @@ const char *fs_dir_path(const struct FileDir *dir);
 
 struct FileDirent *fs_dir_read_sync(const struct FileDir *dir);
 
+enum ReaddirResultType fs_readdir_get_type_at(const struct ReaddirResultArray *value, uintptr_t at);
+
+const char *fs_readdir_get_string_value_at(const struct ReaddirResultArray *value, uintptr_t at);
+
+struct Buffer *fs_readdir_get_buffer_value_at(const struct ReaddirResultArray *value, uintptr_t at);
+
+struct FileDirent *fs_readdir_get_type_value_at(const struct ReaddirResultArray *value,
+                                                uintptr_t at);
+
 enum ReaddirResultType fs_readdir_get_type(const struct ReaddirResult *value);
 
 const char *fs_readdir_get_string_value(const struct ReaddirResult *value);
@@ -389,6 +404,16 @@ void fs_append_file_with_buffer_buffer_sync(struct Buffer *dest,
 void fs_append_file_with_buffer_string_sync(struct Buffer *dest,
                                             const char *data,
                                             struct AppendFileOptions options);
+
+void fs_async_append_file_with_buffer_string(struct Buffer *dest,
+                                             const char *data,
+                                             struct AppendFileOptions options,
+                                             const struct AsyncClosure *callback);
+
+void fs_async_append_file_with_buffer_buffer(struct Buffer *dest,
+                                             const struct Buffer *data,
+                                             struct AppendFileOptions options,
+                                             const struct AsyncClosure *callback);
 
 void fs_chmod_sync(const char *path, uint32_t mode);
 
@@ -632,6 +657,14 @@ void fs_async_read(int32_t fd,
                    intptr_t position,
                    const struct AsyncUsizeClosure *callback);
 
+void fs_async_read_bytes(int32_t fd,
+                         uint8_t *buffer,
+                         uintptr_t buffer_length,
+                         uintptr_t offset,
+                         uintptr_t length,
+                         intptr_t position,
+                         const struct AsyncUsizeClosure *callback);
+
 void fs_async_readdir(const char *path,
                       struct ReaddirOptions options,
                       const struct AsyncReaddirClosure *callback);
@@ -722,6 +755,12 @@ void fs_async_write(int32_t fd,
                     struct WriteOptions options,
                     const struct AsyncUsizeClosure *callback);
 
+void fs_async_write_slice(int32_t fd,
+                          const uint8_t *buffer,
+                          uintptr_t length,
+                          struct WriteOptions options,
+                          const struct AsyncUsizeClosure *callback);
+
 void fs_async_write_string(int32_t fd,
                            const char *string,
                            enum StringEncoding encoding,
@@ -738,6 +777,12 @@ void fs_async_write_file_with_bytes(int32_t fd,
                                     struct WriteFileOptions options,
                                     const struct AsyncClosure *callback);
 
+void fs_async_write_file_with_bytes_raw(int32_t fd,
+                                        const uint8_t *data,
+                                        uintptr_t length,
+                                        struct WriteFileOptions options,
+                                        const struct AsyncClosure *callback);
+
 void fs_async_write_file_with_str_from_path(const char *path,
                                             const char *data,
                                             struct WriteFileOptions options,
@@ -748,11 +793,24 @@ void fs_async_write_file_with_bytes_from_path(const char *path,
                                               struct WriteFileOptions options,
                                               const struct AsyncClosure *callback);
 
+void fs_async_write_file_with_bytes_from_path_raw(const char *path,
+                                                  const uint8_t *data,
+                                                  uintptr_t length,
+                                                  struct WriteFileOptions options,
+                                                  const struct AsyncClosure *callback);
+
 void fs_async_writev(int32_t fd,
                      const struct Buffer *buffers,
                      uintptr_t length,
                      uintptr_t position,
                      const struct AsyncUsizeClosure *callback);
+
+void fs_async_writev_slice(int fd,
+                           uint8_t *const *buffers,
+                           const uintptr_t *buffers_buffers,
+                           uintptr_t length,
+                           int64_t position,
+                           const struct AsyncUsizeClosure *callback);
 
 void fs_handle_new_async(const char *path,
                          int32_t flags,
@@ -800,6 +858,13 @@ void fs_handle_read_bytes(struct FileHandle *handle,
 void fs_handle_read_file(struct FileHandle *handle,
                          struct ReadFileOptions options,
                          const struct AsyncFsEncodingClosure *callback);
+
+void fs_async_readv_slice(int fd,
+                          uint8_t *const *buffers,
+                          const uintptr_t *buffers_buffers,
+                          uintptr_t length,
+                          int64_t position,
+                          const struct AsyncUsizeClosure *callback);
 
 void fs_handle_readv_slice(struct FileHandle *handle,
                            uint8_t *const *buffers,
@@ -888,6 +953,10 @@ const char *fs_watch_event_filename(const struct WatchEvent *event);
 void fs_file_dir_destroy(struct FileDir *value);
 
 void fs_filehandle_destroy(struct FileHandle *value);
+
+void fs_async_file_watch_closure_destroy(struct AsyncFileWatchClosure *value);
+
+void fs_async_watch_closure_destroy(struct AsyncWatchClosure *value);
 
 struct AsyncClosure *fs_async_create_async_closure(void *on_success, void *on_error, void *data);
 

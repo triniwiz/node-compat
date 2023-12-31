@@ -84,6 +84,33 @@ function parseFlags(flags: string) {
   return ret;
 }
 
+class FSWatcher {
+  _native: any;
+  close() {
+    this._native.close();
+  }
+
+  ref() {
+    this._native.ref();
+  }
+
+  unref() {
+    this._native.unref();
+  }
+}
+
+class StatWatcher {
+  _native: any;
+
+  ref() {
+    this._native.ref();
+  }
+
+  unref() {
+    this._native.unref();
+  }
+}
+
 class Fs {
   static accessSync(path: string | Buffer, mode = 0) {
     if (path instanceof Buffer) {
@@ -248,7 +275,7 @@ class Fs {
       path = path.toString();
     }
 
-    return NSCFS.mkdirSync(path, options);
+    return NSCFS.mkdirSync(path, { recursive: false, mode: 0o777, ...options });
   }
 
   static mkdtempSync(prefix: string, options?: { encoding?: string }) {
@@ -287,7 +314,7 @@ class Fs {
       path = path.toString();
     }
 
-    return NSCFS.readdirSync(path, options);
+    return NSCFS.readdirSync(path, { encoding: 'utf8', withFileTypes: false, recursive: false, ...options });
   }
 
   static readFileSync(
@@ -488,6 +515,41 @@ class Fs {
     }
     NSCFS.open(path, flags ?? 'r', mode ?? 0o666, callback);
   }
+
+  static watch(filename: string | Buffer | URL, options: { persistent?: boolean; recursive?: boolean; encoding?: string; signal?: any }, listener?: (eventType: string, filename: string | Buffer | null) => void): FSWatcher {
+    if (filename instanceof Buffer) {
+      filename = filename.toString('utf-8');
+    } else if (typeof filename !== 'number') {
+      filename = filename.toString();
+    }
+
+    const watcher = (NSCFS as any).watch(filename, { persistent: true, recursive: false, encoding: 'utf8', ...options }, (error, object: { eventType: string; filename: string }) => {
+      if (listener) {
+        listener(object?.eventType, object?.filename);
+      }
+    });
+
+    const ret = new FSWatcher();
+    ret._native = watcher;
+    return ret;
+  }
+
+  static watchFile(filename: string | Buffer | URL, options: { bigint?: boolean; persistent?: boolean; interval?: number }, listener?: (current: any, previous: any) => void): StatWatcher {
+    if (filename instanceof Buffer) {
+      filename = filename.toString('utf-8');
+    } else if (typeof filename !== 'number') {
+      filename = filename.toString();
+    }
+
+    const watcher = (NSCFS as any).watchFile(filename, { bigint: false, persistent: true, encoding: 'utf8', interval: 5007, ...options }, (error, object: { current: any; previous: any }) => {
+      if (listener) {
+        listener(object?.current, object?.previous);
+      }
+    });
+    const ret = new StatWatcher();
+    ret._native = watcher;
+    return ret;
+  }
 }
 
 export const accessSync = Fs.accessSync;
@@ -530,3 +592,5 @@ export const writeSync = Fs.writeSync;
 export const writevSync = Fs.writevSync;
 
 export const open = Fs.open;
+export const watch = Fs.watch;
+export const watchFile = Fs.watchFile;

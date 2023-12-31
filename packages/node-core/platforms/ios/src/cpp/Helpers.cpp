@@ -178,7 +178,7 @@ void async_success_filewatch_event(FileWatchEvent *value, void *data) {
             callback->Call(context, context->Global(), 2,
                            args);  // ignore JS return value
 
-            delete func;
+           // delete func;
         }
     }
 }
@@ -209,7 +209,7 @@ void async_success_watch_event(WatchEvent *value, void *data) {
             callback->Call(context, context->Global(), 2,
                            args);  // ignore JS return value
 
-            delete func;
+          //  delete func;
         }
     }
 }
@@ -268,18 +268,16 @@ void async_success_readdir(ReaddirResultArray *value, void *data) {
             v8::Local<v8::Context> context = callback->GetCreationContextChecked();
             v8::Context::Scope context_scope(context);
             auto len = value->length;
-            auto size = sizeof(value->data);
             auto array = v8::Array::New(isolate, len);
             for (int i = 0; i < len; i++) {
-                auto item = (&value->data)[size * i];
-                switch (fs_readdir_get_type(item)) {
+                switch (fs_readdir_get_type_at(value, i)) {
                     case ReaddirResultTypeString:
                         array->Set(context, i, Helpers::ConvertToV8String(isolate,
-                                                                          fs_readdir_get_string_value(
-                                                                                  item)));
+                                                                          fs_readdir_get_string_value_at(
+                                                                                  value, i)));
                         break;
                     case ReaddirResultTypeBuffer: {
-                        auto buf = fs_readdir_get_buffer_value(item);
+                        auto buf = fs_readdir_get_buffer_value_at(value, i);
                         auto bufferImpl = new BufferImpl(buf);
 
                         auto ext = v8::External::New(isolate, bufferImpl);
@@ -293,7 +291,7 @@ void async_success_readdir(ReaddirResultArray *value, void *data) {
                     }
                         break;
                     case ReaddirResultTypeType: {
-                        auto dirent = fs_readdir_get_type_value(item);
+                        auto dirent = fs_readdir_get_type_value_at(value, i);
                         auto direntImpl = new FileDirentImpl(dirent);
 
                         auto ext = v8::External::New(isolate, direntImpl);
@@ -824,7 +822,7 @@ void Helpers::ParseReaddirOptions(v8::Isolate *isolate, const v8::Local<v8::Valu
                 &withFileTypesValue);
 
         if (withFileTypesValue->IsBoolean()) {
-            options.with_file_types = (size_t) withFileTypesValue->BooleanValue(isolate);
+            options.with_file_types = withFileTypesValue->BooleanValue(isolate);
         } else {
             options.with_file_types = false;
         }

@@ -196,7 +196,33 @@ try {
 
 */
 
+//console.log(fs.readdirSync(knownFolders.currentApp().path, { withFileTypes: true }));
+
 const hello = path.join(knownFolders.currentApp().path + '/documents/hello.txt');
+
+console.log(knownFolders.documents().path);
+
+global.watchingFile = fs.watchFile(knownFolders.documents().path + '/hello.txt', null, (current, previous) => {
+  console.log('watchingFile event', current, previous);
+});
+
+// global.watching = fs.watch(knownFolders.documents().path + '/hello.txt', null, (eventType, filename) => {
+//   console.log('watching event', eventType, filename);
+// });
+
+//fs.writeFileSync(knownFolders.documents().path + '/hello.txt', 'text');
+
+// fs.rmdirSync(knownFolders.documents().path + '/ns_test');
+// fsPromises
+//   .mkdir(knownFolders.documents().path + '/ns_test/1', { recursive: true })
+//   .then(() => {
+//     console.log('done');
+//     console.log(fs.readdirSync(knownFolders.documents().path + '/ns_test', { withFileTypes: true }));
+//     console.log(fs.readdirSync(knownFolders.documents().path + '/ns_test/1'));
+//   })
+//   .catch((e) => {
+//     console.log('mkdir failed', e);
+//   });
 
 /*
 try {
@@ -222,10 +248,69 @@ try {
 //   console.log('open', error, fd);
 // });
 
-fsPromises
-  .open(hello)
-  .then(async (handle) => {
+// console.time('appendFileSync');
+// fs.appendFileSync(hello, ' data to append', { flag: 'a' });
+// console.timeEnd('appendFileSync');
+// console.log('The "data to append" was appended to file!');
+
+// fsPromises
+//   .appendFile(hello, ' data to append', { flag: 'a' })
+//   .then(() => {
+//     console.log('appendFile');
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+
+// fsPromises
+//   .stat(hello)
+//   .then((stat) => {
+//     console.log('stat', stat);
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+
+// console.time('exists');
+// fsPromises
+//   .exists(hello)
+//   .then((exists) => {
+//     console.log('exists', exists);
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+// console.timeEnd('exists');
+
+// console.time('existsSync');
+// const exists = fs.existsSync(hello);
+// console.timeEnd('existsSync');
+
+// console.log('exists ?', exists);
+//
+
+// try {
+//   fs.copyFileSync(hello, knownFolders.documents().path + '/hello.txt');
+// } catch (error) {
+//   console.log('copyFileSync error', error);
+// }
+
+// console.log(knownFolders.documents().path);
+
+// fsPromises
+//   .readdir(knownFolders.currentApp().path, { withFileTypes: true, recursive: true })
+//   .then((result) => {
+//     console.log(result);
+//   })
+//   .catch((error) => {
+//     console.log('readdir error', error);
+//   });
+
+/*
+const func = async () => {
+  await fsPromises.open(hello).then(async (handle) => {
     console.log(handle.fd);
+
     const stat = await handle.stat();
 
     console.log(stat);
@@ -236,10 +321,16 @@ fsPromises
 
     console.log(buffer.toString('uft8', 0, 11), read);
 
-    await handle.close();
-  })
-  .catch((err) => {
-    console.log('promise error', err);
+    return handle.close();
   });
 
+  console.time('appendFileSync');
+  await fsPromises.appendFile(hello, ' data to append', { flag: 'a' });
+  console.timeEnd('appendFileSync');
+  console.log('The "data to append" was appended to file!');
+};
+
+func();
+
+*/
 Application.run({ moduleName: 'app-root' });

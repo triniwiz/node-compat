@@ -72,6 +72,8 @@ add_library(
         ${CPP_DIR}/FileDirentImpl.cpp
         ${CPP_DIR}/FileHandleImpl.cpp
         ${CPP_DIR}/NodeNativeJSIModule.cpp
+        ${CPP_DIR}/StatWatcherImpl.cpp
+        ${CPP_DIR}/FSWatcherImpl.cpp
 
         ${NODE_ANDROID_BRIDGE_CPP}
 )

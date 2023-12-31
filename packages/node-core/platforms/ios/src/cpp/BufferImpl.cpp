@@ -583,6 +583,10 @@ void BufferImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
         if (len == 0) {
             auto ret = buffer_to_print_string(ptr->buffer_);
+            if (ret == nullptr) {
+                args.GetReturnValue().SetEmptyString();
+                return;
+            }
             args.GetReturnValue().Set(
                     Helpers::ConvertToV8String(isolate, ret)
             );
