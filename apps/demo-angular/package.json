@@ -1,7 +1,10 @@
 {
   "main": "./src/main.ts",
   "dependencies": {
-    "@nativescript/core": "file:../../node_modules/@nativescript/core"
+    "@nativescript/core": "file:../../node_modules/@nativescript/core",
+    "@nativescript/node-core": "file:../../dist/packages/node-core",
+    "@nativescript/node-fs": "file:../../dist/packages/node-fs",
+    "@nativescript/node-buffer": "file:../../dist/packages/node-buffer"
   },
   "devDependencies": {
     "@nativescript/android": "~8.4.0",

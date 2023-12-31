@@ -1,0 +1,11 @@
+[package]
+name = "node-ios"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "nodenative"
+crate-type = ["staticlib"]
+
+[dependencies]
+node-c = { path = "../../libs/node-c" }

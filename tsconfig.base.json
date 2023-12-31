@@ -20,7 +20,11 @@
       }
     ],
     "paths": {
-      "@demo/shared": ["tools/demo/index.ts"]
+      "@demo/shared": ["tools/demo/index.ts"],
+      "@nativescript/*": ["packages/*"],
+      "@nativescript/node-core": ["packages/node-core/index.d.ts"],
+      "@nativescript/node-fs": ["packages/node-fs/index.d.ts"],
+      "@nativescript/node-buffer": ["packages/node-buffer/index.d.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

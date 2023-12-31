@@ -1,3 +1,336 @@
-import { Application } from '@nativescript/core';
+/* eslint-disable @nrwl/nx/enforce-module-boundaries */
+import { Application, knownFolders, path } from '@nativescript/core';
 
+import * as fs from '@nativescript/node-fs';
+
+import * as fsPromises from '@nativescript/node-fs/promises';
+
+import * as b from 'buffer';
+
+import { Buffer } from '@nativescript/node-buffer';
+
+/*
+
+
+console.time('from');
+const buffer = Buffer.from('hello world', 'utf8');
+console.timeEnd('from');
+
+console.time('from');
+const a = b.Buffer.from('hello world', 'utf8');
+console.timeEnd('from');
+
+// console.time('from');
+// const c = global.NSCBuffer.from("hello world", 'utf8');
+// console.timeEnd('from');
+
+console.log(buffer.toString());
+
+console.time('toString');
+console.log(buffer.toString('hex'));
+// Prints: 68656c6c6f20776f726c64
+console.log(buffer.toString('base64'));
+// Prints: aGVsbG8gd29ybGQ=
+console.timeEnd('toString');
+
+console.time('toString');
+console.log(a.toString('hex'));
+// Prints: 68656c6c6f20776f726c64
+console.log(a.toString('base64'));
+// Prints: aGVsbG8gd29ybGQ=
+console.timeEnd('toString');
+
+console.log(Buffer.from('fhqwhgads', 'utf8'));
+// Prints: <Buffer 66 68 71 77 68 67 61 64 73>
+console.log(Buffer.from('fhqwhgads', 'utf16le'));
+// Prints: <Buffer 66 00 68 00 71 00 77 00 68 00 67 00 61 00 64 00 73 00>
+
+// Create a single `Buffer` from a list of three `Buffer` instances.
+
+const buf1 = Buffer.alloc(10);
+const buf2 = Buffer.alloc(14);
+const buf3 = Buffer.alloc(18);
+const totalLength = buf1.length + buf2.length + buf3.length;
+
+console.log(totalLength);
+// Prints: 42
+
+const bufA = Buffer.concat([buf1, buf2, buf3], totalLength);
+
+console.log(bufA);
+// Prints: <Buffer 00 00 00 00 ...>
+console.log(bufA.length);
+// Prints: 42
+
+const str = 'Node.js';
+const buf = Buffer.allocUnsafe(str.length);
+
+console.time('buf[index]');
+for (let i = 0; i < str.length; i++) {
+  buf[i] = str.charCodeAt(i);
+}
+console.timeEnd('buf[index]');
+console.log('hey', buf, buf[1]);
+console.log('indexed', buf.toString('utf8'));
+// Prints: Node.js
+
+const buff = Buffer.from([0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff]);
+console.log(buff.length);
+
+console.log(buff.readBigUInt64BE(0));
+// Prints: 4294967295n
+
+const u16 = new Uint16Array([0, 0xffff]);
+const copy = Buffer.copyBytesFrom(u16, 1, 1);
+u16[1] = 0;
+console.log('copy', copy.length); // 2
+console.log('copy', copy[0]); // 255
+console.log('copy', copy[1]); // 255
+
+try {
+  const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
+
+  fs.accessSync(img);
+} catch (error) {
+  console.log(error);
+}
+
+// try {
+//   const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
+//   const buffer = global.NSCBuffer.alloc(2_000_000);
+//   console.log(buffer.length);
+//   const file = new java.io.File(img);
+//   const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+//   const fd = pfd.detachFd();
+//   const read = global.NSCFS.readSync(fd, buffer);
+//   console.log('read', read);
+
+//   // console.log(buffer.toString());
+// } catch (error) {
+//   console.log(error);
+// }
+const hello = path.join(knownFolders.currentApp().path + '/documents/hello.txt');
+
+// try {
+//   const buffer = global.NSCBuffer.alloc(1000);
+//   const file = new java.io.File(hello);
+//   const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+//   const fd = pfd.detachFd();
+//   console.time('read');
+//   const read = global.NSCFS.readSync(fd, buffer);
+//   console.timeEnd('read');
+//   console.log('read', read);
+//   console.log(buffer.toString('utf8'));
+
+//   // console.log(buffer.toString());
+// } catch (error) {
+//   console.log(error);
+// }
+
+if (global.isAndroid) {
+  try {
+    const file = new java.io.File(hello);
+    // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_WRITE | android.os.ParcelFileDescriptor.MODE_APPEND);
+    // const fd = pfd.detachFd();
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+if (global.isIOS) {
+}
+
+console.time('appendFileSync');
+fs.appendFileSync(hello, ' data to append', { flag: 'a' });
+console.timeEnd('appendFileSync');
+console.log('The "data to append" was appended to file!');
+// try {
+//   const file = new java.io.File(hello);
+//   const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+//   const fd = pfd.detachFd();
+//   console.time('fstatSync');
+//   const stat = fs.fstatSync(fd, { bigint: true });
+//   console.timeEnd('fstatSync');
+//   console.log('fstatSync ', stat);
+// } catch (err) {
+//   console.log(err);
+// }
+
+let absolutePath;
+if (global.isAndroid) {
+  const file = new java.io.File(hello);
+  absolutePath = file.getAbsolutePath();
+}
+
+if (global.isIOS) {
+  const file = NSURL.URLWithString(hello);
+  absolutePath = file.absoluteString;
+}
+
+try {
+  console.time('statSync');
+  const stat = fs.statSync(absolutePath, { bigint: true });
+  console.timeEnd('statSync');
+  console.log(
+    'statSync ',
+    JSON.stringify(stat, (key, value) => {
+      if (value && typeof value === 'object') {
+        const ret = {};
+        Object.keys(value).forEach((key) => {
+          const item = value[key];
+          if (typeof item === 'bigint') {
+            ret[key] = item.toString();
+          } else {
+            ret[key] = item;
+          }
+        });
+
+        return ret;
+      }
+      return value;
+    })
+  );
+} catch (err) {
+  console.log(err);
+}
+
+*/
+
+//console.log(fs.readdirSync(knownFolders.currentApp().path, { withFileTypes: true }));
+
+const hello = path.join(knownFolders.currentApp().path + '/documents/hello.txt');
+
+console.log(knownFolders.documents().path);
+
+global.watchingFile = fs.watchFile(knownFolders.documents().path + '/hello.txt', null, (current, previous) => {
+  console.log('watchingFile event', current, previous);
+});
+
+// global.watching = fs.watch(knownFolders.documents().path + '/hello.txt', null, (eventType, filename) => {
+//   console.log('watching event', eventType, filename);
+// });
+
+//fs.writeFileSync(knownFolders.documents().path + '/hello.txt', 'text');
+
+// fs.rmdirSync(knownFolders.documents().path + '/ns_test');
+// fsPromises
+//   .mkdir(knownFolders.documents().path + '/ns_test/1', { recursive: true })
+//   .then(() => {
+//     console.log('done');
+//     console.log(fs.readdirSync(knownFolders.documents().path + '/ns_test', { withFileTypes: true }));
+//     console.log(fs.readdirSync(knownFolders.documents().path + '/ns_test/1'));
+//   })
+//   .catch((e) => {
+//     console.log('mkdir failed', e);
+//   });
+
+/*
+try {
+  const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
+  const buffer = global.NSCBuffer.alloc(2_000_000);
+  console.log(buffer.length);
+  const fd = fs.openSync(img, null, null);
+  // const file = new java.io.File(img);
+  // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+  // const fd = pfd.detachFd();
+  const read = fs.readSync(fd, buffer);
+  console.log('read', read);
+  fs.closeSync(fd);
+
+  // console.log(buffer.toString());
+} catch (error) {
+  console.log(error);
+}
+
+*/
+
+// fs.open(hello, null, null, (error, fd) => {
+//   console.log('open', error, fd);
+// });
+
+// console.time('appendFileSync');
+// fs.appendFileSync(hello, ' data to append', { flag: 'a' });
+// console.timeEnd('appendFileSync');
+// console.log('The "data to append" was appended to file!');
+
+// fsPromises
+//   .appendFile(hello, ' data to append', { flag: 'a' })
+//   .then(() => {
+//     console.log('appendFile');
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+
+// fsPromises
+//   .stat(hello)
+//   .then((stat) => {
+//     console.log('stat', stat);
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+
+// console.time('exists');
+// fsPromises
+//   .exists(hello)
+//   .then((exists) => {
+//     console.log('exists', exists);
+//   })
+//   .catch((e) => {
+//     console.log('e', e);
+//   });
+// console.timeEnd('exists');
+
+// console.time('existsSync');
+// const exists = fs.existsSync(hello);
+// console.timeEnd('existsSync');
+
+// console.log('exists ?', exists);
+//
+
+// try {
+//   fs.copyFileSync(hello, knownFolders.documents().path + '/hello.txt');
+// } catch (error) {
+//   console.log('copyFileSync error', error);
+// }
+
+// console.log(knownFolders.documents().path);
+
+// fsPromises
+//   .readdir(knownFolders.currentApp().path, { withFileTypes: true, recursive: true })
+//   .then((result) => {
+//     console.log(result);
+//   })
+//   .catch((error) => {
+//     console.log('readdir error', error);
+//   });
+
+/*
+const func = async () => {
+  await fsPromises.open(hello).then(async (handle) => {
+    console.log(handle.fd);
+
+    const stat = await handle.stat();
+
+    console.log(stat);
+
+    const buffer = Buffer.alloc(1000);
+
+    const read = await handle.read(buffer);
+
+    console.log(buffer.toString('uft8', 0, 11), read);
+
+    return handle.close();
+  });
+
+  console.time('appendFileSync');
+  await fsPromises.appendFile(hello, ' data to append', { flag: 'a' });
+  console.timeEnd('appendFileSync');
+  console.log('The "data to append" was appended to file!');
+};
+
+func();
+
+*/
 Application.run({ moduleName: 'app-root' });
