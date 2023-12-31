@@ -223,23 +223,20 @@ try {
 // });
 
 fsPromises
-  .open(hello, null, null)
-  .then((handle) => {
+  .open(hello)
+  .then(async (handle) => {
     console.log(handle.fd);
-    handle
-      .stat()
-      .then((stat) => {
-        console.log(stat);
-      })
-      .catch((err) => {
-        console.log('stat error', err);
-      });
+    const stat = await handle.stat();
+
+    console.log(stat);
 
     const buffer = Buffer.alloc(1000);
 
-    handle.read(buffer).then((done) => {
-      console.log(buffer.toString('uft8', 0, 11));
-    });
+    const read = await handle.read(buffer);
+
+    console.log(buffer.toString('uft8', 0, 11), read);
+
+    await handle.close();
   })
   .catch((err) => {
     console.log('promise error', err);

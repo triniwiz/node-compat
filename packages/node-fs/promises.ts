@@ -209,7 +209,7 @@ export class FileHandle {
   }
 }
 
-function openFunc(path: string | Buffer | URL, flags: string | number, mode: string | number): Promise<FileHandle> {
+function openFunc(path: string | Buffer | URL, flags: string | number = 'r', mode: string | number = 0o666): Promise<FileHandle> {
   if (path instanceof Buffer) {
     path = path.toString('utf-8');
   } else if (typeof path !== 'number') {
