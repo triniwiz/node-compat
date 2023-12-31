@@ -101,6 +101,21 @@ impl FileHandle {
         let fd = self.fd();
         crate::a_sync::read(fd, buffer, offset, length, position, callback);
     }
+
+
+    pub fn read_bytes(
+        &mut self,
+        buffer: &mut [u8],
+        offset: usize,
+        length: usize,
+        position: isize,
+        callback: Arc<AsyncClosure<usize, std::io::Error>>,
+    ) {
+        let fd = self.fd();
+        crate::a_sync::read_bytes(fd, buffer, offset, length, position, callback);
+    }
+
+
     pub fn read_file(
         &mut self,
         options: ReadFileOptions,
@@ -108,6 +123,17 @@ impl FileHandle {
     ) {
         let fd = self.fd();
         crate::a_sync::read_file_with_fd(fd, options, callback);
+    }
+
+
+    pub fn readv_slice(
+        &mut self,
+        buffers: Vec<Buffer>,
+        position: c_long,
+        callback: Arc<AsyncClosure<usize, std::io::Error>>,
+    ) {
+        let fd = self.fd();
+        crate::a_sync::readv_slice(fd, buffers, position, callback);
     }
 
     pub fn readv(
@@ -195,4 +221,5 @@ impl FileHandle {
         let fd = self.fd();
         crate::a_sync::writev(fd, buffers, position, callback);
     }
+
 }

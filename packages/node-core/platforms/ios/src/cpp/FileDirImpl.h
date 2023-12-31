@@ -19,6 +19,13 @@ public:
 
     FileDirImpl(FileDir *dir);
 
+    ~FileDirImpl() {
+        if (dir_ != nullptr) {
+            fs_file_dir_destroy(dir_);
+            dir_ = nullptr;
+        }
+    }
+
     static void Init(v8::Isolate *isolate);
 
     static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate *isolate);

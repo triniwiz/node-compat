@@ -751,6 +751,14 @@ impl ReadFileOptions {
     pub fn set_encoding(&mut self, encoding: FsEncodingType) {
         self.encoding = encoding
     }
+
+    pub fn set_flag(&mut self, flag: i32) {
+        self.flag = flag;
+    }
+
+    pub fn flag(&self) -> i32 {
+        self.flag
+    }
 }
 
 fn read_file_with_file(file: &mut File, options: ReadFileOptions) -> std::io::Result<FsEncoding> {

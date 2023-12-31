@@ -69,6 +69,8 @@ typedef struct FileHandle FileHandle;
 
 typedef struct FsEncoding FsEncoding;
 
+typedef struct NodeError NodeError;
+
 typedef struct ReaddirResult ReaddirResult;
 
 typedef struct FileStat {
@@ -169,7 +171,15 @@ typedef struct WriteFileOptions {
   int32_t flag;
 } WriteFileOptions;
 
+void node_string_destroy(char *string);
+
 void filestat_destroy(struct FileStat *file_stat);
+
+const char *node_error_get_clazz(const struct NodeError *error);
+
+const char *node_error_get_message(const struct NodeError *error);
+
+void node_error_destroy(struct NodeError *error);
 
 /**
  * Write the latest error message to a buffer.
@@ -816,34 +826,50 @@ void fs_handle_writev(struct FileHandle *handle,
                       uintptr_t position,
                       const struct AsyncUsizeClosure *callback);
 
-struct AsyncClosure *fs_async_create_async_closure(void *on_success, void *on_error);
+struct AsyncClosure *fs_async_create_async_closure(void *on_success, void *on_error, void *data);
 
-struct AsyncBoolClosure *fs_async_create_async_bool_closure(void *on_success, void *on_error);
+struct AsyncBoolClosure *fs_async_create_async_bool_closure(void *on_success,
+                                                            void *on_error,
+                                                            void *data);
 
 struct AsyncFileStatClosure *fs_async_create_async_file_stat_closure(void *on_success,
-                                                                     void *on_error);
+                                                                     void *on_error,
+                                                                     void *data);
 
-struct AsyncStringClosure *fs_async_create_async_string_closure(void *on_success, void *on_error);
+struct AsyncStringClosure *fs_async_create_async_string_closure(void *on_success,
+                                                                void *on_error,
+                                                                void *data);
 
-struct AsyncUsizeClosure *fs_async_create_async_usize_closure(void *on_success, void *on_error);
+struct AsyncUsizeClosure *fs_async_create_async_usize_closure(void *on_success,
+                                                              void *on_error,
+                                                              void *data);
 
-struct AsyncI32Closure *fs_async_create_async_i32_closure(void *on_success, void *on_error);
+struct AsyncI32Closure *fs_async_create_async_i32_closure(void *on_success,
+                                                          void *on_error,
+                                                          void *data);
 
 struct AsyncFileWatchClosure *fs_async_create_async_file_watch_closure(void *on_success,
-                                                                       void *on_error);
+                                                                       void *on_error,
+                                                                       void *data);
 
 struct AsyncFsEncodingClosure *fs_async_create_async_fs_encoding_closure(void *on_success,
-                                                                         void *on_error);
+                                                                         void *on_error,
+                                                                         void *data);
 
-struct AsyncWatchClosure *fs_async_create_async_fs_watch_closure(void *on_success, void *on_error);
+struct AsyncWatchClosure *fs_async_create_async_fs_watch_closure(void *on_success,
+                                                                 void *on_error,
+                                                                 void *data);
 
 struct AsyncReaddirClosure *fs_async_create_async_fs_readdir_closure(void *on_success,
-                                                                     void *on_error);
+                                                                     void *on_error,
+                                                                     void *data);
 
 struct AsyncFileDirClosure *fs_async_create_async_fs_file_dir_closure(void *on_success,
-                                                                      void *on_error);
+                                                                      void *on_error,
+                                                                      void *data);
 
 struct AsyncFileHandleClosure *fs_async_create_async_fs_file_handle_closure(void *on_success,
-                                                                            void *on_error);
+                                                                            void *on_error,
+                                                                            void *data);
 
 #endif /* NODE_C_H */

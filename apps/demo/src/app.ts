@@ -1,10 +1,16 @@
+/* eslint-disable @nrwl/nx/enforce-module-boundaries */
 import { Application, knownFolders, path } from '@nativescript/core';
 
 import * as fs from '@nativescript/node-fs';
 
+import * as fsPromises from '@nativescript/node-fs/promises';
+
+import * as b from 'buffer';
+
 import { Buffer } from '@nativescript/node-buffer';
 
-const b = require('buffer');
+/*
+
 
 console.time('from');
 const buffer = Buffer.from('hello world', 'utf8');
@@ -128,7 +134,6 @@ if (global.isAndroid) {
     // const fd = pfd.detachFd();
   } catch (err) {
     console.log(err);
-    /* Handle the error */
   }
 }
 
@@ -149,7 +154,6 @@ console.log('The "data to append" was appended to file!');
 //   console.log('fstatSync ', stat);
 // } catch (err) {
 //   console.log(err);
-//   /* Handle the error */
 // }
 
 let absolutePath;
@@ -188,11 +192,57 @@ try {
   );
 } catch (err) {
   console.log(err);
-  /* Handle the error */
 }
 
-fs.open(hello, null, null, (error, fd) => {
-  console.log(error, fd);
-});
+*/
+
+const hello = path.join(knownFolders.currentApp().path + '/documents/hello.txt');
+
+/*
+try {
+  const img = path.join(knownFolders.currentApp().path + '/images/1057903.jpg');
+  const buffer = global.NSCBuffer.alloc(2_000_000);
+  console.log(buffer.length);
+  const fd = fs.openSync(img, null, null);
+  // const file = new java.io.File(img);
+  // const pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+  // const fd = pfd.detachFd();
+  const read = fs.readSync(fd, buffer);
+  console.log('read', read);
+  fs.closeSync(fd);
+
+  // console.log(buffer.toString());
+} catch (error) {
+  console.log(error);
+}
+
+*/
+
+// fs.open(hello, null, null, (error, fd) => {
+//   console.log('open', error, fd);
+// });
+
+fsPromises
+  .open(hello, null, null)
+  .then((handle) => {
+    console.log(handle.fd);
+    handle
+      .stat()
+      .then((stat) => {
+        console.log(stat);
+      })
+      .catch((err) => {
+        console.log('stat error', err);
+      });
+
+    const buffer = Buffer.alloc(1000);
+
+    handle.read(buffer).then((done) => {
+      console.log(buffer.toString('uft8', 0, 11));
+    });
+  })
+  .catch((err) => {
+    console.log('promise error', err);
+  });
 
 Application.run({ moduleName: 'app-root' });

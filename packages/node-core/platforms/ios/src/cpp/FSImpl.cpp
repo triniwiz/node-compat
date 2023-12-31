@@ -206,6 +206,10 @@ v8::Local<v8::FunctionTemplate> FSImpl::GetCtor(v8::Isolate *isolate) {
             Helpers::ConvertToV8String(isolate, "open"),
             v8::FunctionTemplate::New(isolate, &Open));
 
+    ctorTmpl->Set(
+            Helpers::ConvertToV8String(isolate, "openHandle"),
+            v8::FunctionTemplate::New(isolate, &OpenHandle));
+
     cache->FsTmpl =
             std::make_unique<v8::Persistent<v8::FunctionTemplate>>(isolate, ctorTmpl);
 
@@ -330,7 +334,7 @@ void FSImpl::ChmodSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
     auto pathValue = args[0];
-    auto mode = args[0]->NumberValue(ctx).ToChecked();
+    auto mode = args[1]->NumberValue(ctx).ToChecked();
     if (!pathValue->IsString()) {
         isolate->ThrowError("Invalid Path");
     }
@@ -1466,6 +1470,10 @@ void FSImpl::WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
     int32_t fd = -1;
 
+    if (fdValue->IsNumber()) {
+        fd = (int32_t) fdValue->NumberValue(ctx).ToChecked();
+    }
+
 
     int64_t position = -1;
     auto positionValue = args[2];
@@ -1536,7 +1544,6 @@ void FSImpl::WritevSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 }
 
-
 void FSImpl::Open(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     auto ctx = isolate->GetCurrentContext();
@@ -1560,11 +1567,47 @@ void FSImpl::Open(const v8::FunctionCallbackInfo<v8::Value> &args) {
         mode = modeValue->Int32Value(ctx).ToChecked();
     }
 
-    auto success = [](int32_t fd) {
-        Helpers::LogToConsole("fd success");
+    v8::Global<v8::Function> func(isolate, args[3].As<v8::Function>());
+    auto data = new AsyncCallback{
+            isolate,
+            std::move(func)
     };
-    auto error = []() {};
-    auto callback = fs_async_create_async_i32_closure(&success, &error);
+    auto callback = fs_async_create_async_i32_closure((void *) async_success_i32,
+                                                      (void *) async_error, data);
     fs_async_open(path.c_str(), flag, mode, callback);
+
+}
+
+void FSImpl::OpenHandle(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    auto ctx = isolate->GetCurrentContext();
+    auto pathValue = args[0];
+
+    std::string path;
+    if (pathValue->IsString()) {
+        path = Helpers::ConvertFromV8String(isolate, pathValue);
+    }
+
+    auto flagValue = args[1];
+    int32_t flag = O_RDONLY;
+
+    if (flagValue->IsInt32()) {
+        flag = flagValue->Int32Value(ctx).ToChecked();
+    }
+    int32_t mode = 438;
+    auto modeValue = args[2];
+
+    if (modeValue->IsInt32()) {
+        mode = modeValue->Int32Value(ctx).ToChecked();
+    }
+
+    v8::Global<v8::Function> func(isolate, args[3].As<v8::Function>());
+    auto data = new AsyncCallback{
+            isolate,
+            std::move(func)
+    };
+    auto callback = fs_async_create_async_fs_file_handle_closure((void *) async_success_filehandle,
+                                                                 (void *) async_error, data);
+    fs_async_open_handle(path.c_str(), flag, mode, callback);
 
 }

@@ -93,6 +93,8 @@ public:
 
     static void Open(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+    static void OpenHandle(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 };
 
 

@@ -4,26 +4,33 @@ use std::sync::Arc;
 use node_buffer::Buffer;
 use node_fs::a_sync::{FileWatchEvent, WatchEvent};
 use node_fs::file_handle::FileHandle;
+use node_fs::FsEncodingType;
+use node_fs::sync::{AppendFileOptions, ReadFileOptions};
 
 pub fn run() {
     let mut test_txt = std::env::current_dir().unwrap();
     test_txt.push("data/test.txt");
     let callback = Arc::new(node_fs::a_sync::AsyncClosure::<FileHandle, std::io::Error>::new(
-        Box::new(|result, error|{
+        Box::new(|result, error| {
             println!("error {:?}", error);
             match result {
                 None => {}
                 Some(mut handle) => {
                     println!("handle");
-                    let cb =  Arc::new(node_fs::a_sync::AsyncClosure::<(), std::io::Error>::new(
-                        Box::new(|result, error|{
+                    let cb = Arc::new(node_fs::a_sync::AsyncClosure::<(), std::io::Error>::new(
+                        Box::new(|result, error| {
                             println!("write error {:?}", error);
                         })));
-                    let ret = node_fs::sync::read_file_with_fd(handle.fd() as i32, 0);
 
-                    println!("data {}", ret.unwrap().as_string(None, None, None));
+                    let mut options = ReadFileOptions::default();
+                    options.set_encoding(FsEncodingType::Utf8);
+                    let ret = node_fs::sync::read_file_with_fd(handle.fd() as i32, options);
 
-                    handle.append_file_with_str(" NICE!!", cb.clone());
+                    println!("data {:?}", ret.unwrap().get_string_value());
+
+                    let opts = AppendFileOptions::default();
+
+                    handle.append_file_with_str(" NICE!!", opts, cb.clone());
                 }
             }
         })
@@ -47,9 +54,8 @@ pub fn run() {
     //
 
 
-
     let watch_callback = Arc::new(node_fs::a_sync::AsyncClosure::<WatchEvent, std::io::Error>::new(
-        Box::new(|result, error|{
+        Box::new(|result, error| {
             if let Some(error) = error {
                 println!("watch error {:?}", error);
             }
@@ -62,12 +68,10 @@ pub fn run() {
         })
     ));
 
-    let mut current = std::env::current_dir().unwrap().to_string_lossy().as_ref().to_string()  + "/";
+    let mut current = std::env::current_dir().unwrap().to_string_lossy().as_ref().to_string() + "/";
 
-    node_fs::a_sync::watch(current.as_str(), false, true, "", watch_callback);
+    node_fs::a_sync::watch(current.as_str(), false, true, FsEncodingType::Utf8,  watch_callback);
 
 
-    loop {
-
-    }
+    loop {}
 }

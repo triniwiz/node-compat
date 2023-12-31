@@ -1,14 +1,21 @@
 //
 // Created by Osei Fortune on 06/07/2023.
 //
-
+#pragma once
 #ifndef NODECOMPATDEMO_HELPERS_H
 #define NODECOMPATDEMO_HELPERS_H
 
 #include "Common.h"
 
+struct AsyncCallback {
+    v8::Isolate *isolate;
+    v8::Global<v8::Function> callback;
+};
+
+
 class Helpers {
 public:
+
     static const char *LOG_TAG;
 
     static int m_maxLogcatObjectSize;
@@ -60,12 +67,14 @@ public:
 
     static v8::Local<v8::Object>
     FileStatToJS(v8::Isolate *isolate, bool bigInt, const FileStat &stat);
-    
-    
+
+
 #ifdef __ANDROID__
+
     static void sendToADBLogcat(const std::string &message, android_LogPriority logPriority);
+
 #endif
-    
+
     static void LogToConsole(const std::string &message);
 
     static void ThrowIllegalConstructor(v8::Isolate *isolate);
@@ -96,5 +105,22 @@ public:
     static v8::Local<v8::Value>
     GetPrivate(v8::Isolate *isolate, v8::Local<v8::Object> object, const std::string &property);
 };
+
+extern "C" {
+void async_success_closure(void *data);
+void async_success_i32(int32_t value, void *data);
+void async_success_bool(bool value, void *data);
+void async_success_filestat(FileStat *value, void *data);
+void async_success_string(const char *value, void *data);
+void async_success_usize(uintptr_t value, void *data);
+void async_success_filewatch_event(FileWatchEvent *value, void *data);
+void async_success_watch_event(WatchEvent *value, void *data);
+void async_success_fs_encoding(FsEncoding *value, void *data);
+void async_success_readdir(ReaddirResultArray *value, void *data);
+void async_success_filedir(FileDir *value, void *data);
+void async_success_filehandle(FileHandle *value, void *data);
+
+void async_error(NodeError *error, void *data);
+}
 
 #endif //NODECOMPATDEMO_HELPERS_H

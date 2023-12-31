@@ -317,11 +317,11 @@ class Fs {
   }
 
   static readSync(fd: number, buffer: Buffer | ArrayBufferView | DataView, offset?: number, length?: number, position?: number | bigint): number {
-    return NSCFS.readSync(fd, buffer, (offset = 0), (length = -1), position ?? 0);
+    return NSCFS.readSync(fd, buffer, offset ?? 0, length ?? buffer.length, position ?? -1);
   }
 
   static readvSync(fd: number, buffers: ArrayBufferView[], position?: number): number {
-    return NSCFS.readvSync(fd, buffers, position ?? 0);
+    return NSCFS.readvSync(fd, buffers, position ?? -1);
   }
 
   static realpathSync(path: string | Buffer | URL, options?: { encoding?: string }): string | Buffer {

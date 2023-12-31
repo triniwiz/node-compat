@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 node-buffer = { path = "../../libs/node-buffer" }
 node-fs = { path = "../../libs/node-fs" }
+node-c = { path = "../../libs/node-c" }
+log = "0.4.19"

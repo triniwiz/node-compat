@@ -125,7 +125,7 @@ export class Buffer {
     return this._length;
   }
 
-  toString(encoding: StringEncoding = undefined, start = 0, end = -1) {
+  toString(encoding: StringEncoding | string = 'utf-8', start = 0, end = -1) {
     if (arguments.length === 0) {
       return this._native.toString();
     }

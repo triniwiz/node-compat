@@ -82,7 +82,6 @@ FileDirImpl::GetPath(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<
 void
 FileDirImpl::CloseSync(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
-    auto ctx = isolate->GetCurrentContext();
     auto ptr = GetPointer(args.This());
     if (ptr != nullptr) {
         try {

@@ -240,11 +240,12 @@ pub unsafe extern "C" fn filestat_destroy(file_stat: *mut FileStat) {
     let _ = unsafe { Box::from_raw(file_stat) };
 }
 
-pub struct Error(node_core::error::AnyError);
+#[derive(Debug)]
+pub struct NodeError(node_core::error::AnyError);
 
 
 #[no_mangle]
-pub unsafe extern "C" fn node_error_get_clazz(error: *const Error) -> *const c_char {
+pub unsafe extern "C" fn node_error_get_clazz(error: *const NodeError) -> *const c_char {
     if error.is_null() {
         return std::ptr::null();
     }
@@ -255,7 +256,7 @@ pub unsafe extern "C" fn node_error_get_clazz(error: *const Error) -> *const c_c
 
 
 #[no_mangle]
-pub unsafe extern "C" fn node_error_get_message(error: *const Error) -> *const c_char {
+pub unsafe extern "C" fn node_error_get_message(error: *const NodeError) -> *const c_char {
     if error.is_null() {
         return std::ptr::null();
     }
@@ -264,13 +265,24 @@ pub unsafe extern "C" fn node_error_get_message(error: *const Error) -> *const c
     CString::new(message.to_string()).unwrap().into_raw()
 }
 
-impl From<node_core::error::AnyError> for Box<Error> {
+
+#[no_mangle]
+pub unsafe extern "C" fn node_error_destroy(error: *mut NodeError) {
+    if error.is_null() {
+        return;
+    }
+
+    let _ = unsafe { Box::from_raw(error) };
+}
+
+
+impl From<node_core::error::AnyError> for Box<NodeError> {
     fn from(value: AnyError) -> Self {
-        Box::new(Error(value))
+        Box::new(NodeError(value))
     }
 }
 
-impl Error {
+impl NodeError {
     pub fn custom_error(clazz: &'static str, message: &'static str) -> Self {
         Self(
             node_core::error::custom_error(clazz, message)
@@ -309,11 +321,11 @@ fn to_optional(value: isize) -> Option<usize> {
 
 
 thread_local!(
-    static LAST_ERROR: std::cell::RefCell<Option<Box<Error>>> = std::cell::RefCell::new(None);
+    static LAST_ERROR: std::cell::RefCell<Option<Box<NodeError >>> = std::cell::RefCell::new(None);
 );
 
 /// Set the thread-local `LAST_ERROR` variable.
-pub fn update_last_error<E: Into<Box<Error>> + 'static>(e: E) {
+pub fn update_last_error<E: Into<Box<NodeError>> + 'static>(e: E) {
     let boxed = e.into();
 
     LAST_ERROR.with(|last| {
@@ -322,7 +334,7 @@ pub fn update_last_error<E: Into<Box<Error>> + 'static>(e: E) {
 }
 
 /// Get the last error, clearing the variable in the process.
-pub fn get_last_error() -> Option<Box<Error>> {
+pub fn get_last_error() -> Option<Box<NodeError>> {
     LAST_ERROR.with(|last| last.borrow_mut().take())
 }
 
@@ -1704,6 +1716,21 @@ pub struct ReaddirResultArray {
     length: usize,
 }
 
+impl Drop for ReaddirResultArray {
+    fn drop(&mut self) {
+        let _ = unsafe { Vec::from_raw_parts(self.data, self.length, self.length) };
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_readdir_result_array_destroy(value: *mut ReaddirResultArray) {
+    if value.is_null() {
+        return;
+    }
+    let _ = unsafe { Box::from_raw(value) };
+}
+
 #[no_mangle]
 pub extern "C" fn fs_readdir_sync(path: *const c_char, options: ReaddirOptions) -> *mut ReaddirResultArray {
     if path.is_null() {
@@ -1742,6 +1769,15 @@ pub extern "C" fn fs_readdir_sync(path: *const c_char, options: ReaddirOptions) 
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct FsEncoding(node_fs::FsEncoding);
+
+
+#[no_mangle]
+pub extern "C" fn fs_encoding_destroy(value: *mut FsEncoding) {
+    if value.is_null() {
+        return;
+    }
+    let _ = unsafe { Box::from_raw(value) };
+}
 
 impl FsEncoding {
     pub fn is_buffer(&self) -> bool {
@@ -2192,7 +2228,7 @@ pub extern "C" fn fs_async_access(path: *const c_char, access: i32, callback: *c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2219,7 +2255,7 @@ pub extern "C" fn fs_async_append_file_with_str(fd: i32, data: *const c_char, op
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2244,7 +2280,7 @@ pub extern "C" fn fs_async_append_file_with_bytes(fd: i32, data: *const Buffer, 
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2279,7 +2315,7 @@ pub extern "C" fn fs_async_append_file_with_path_str(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2313,7 +2349,7 @@ pub extern "C" fn fs_async_append_file_with_path_bytes(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2340,7 +2376,7 @@ pub extern "C" fn fs_async_chmod(path: *const c_char, mode: u32, callback: *cons
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2367,7 +2403,7 @@ pub extern "C" fn fs_async_chown(path: *const c_char, uid: u32, gid: u32, callba
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2392,7 +2428,7 @@ pub extern "C" fn fs_async_close(fd: i32, callback: *const AsyncClosure) {
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2422,7 +2458,7 @@ pub extern "C" fn fs_async_copy_file(src: *const c_char, dest: *const c_char, fl
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2452,7 +2488,7 @@ pub extern "C" fn fs_async_exists(path: *const c_char, callback: *const AsyncBoo
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result)
@@ -2476,7 +2512,7 @@ pub extern "C" fn fs_async_fchmod(fd: i32, mode: u16, callback: *const AsyncClos
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2500,7 +2536,7 @@ pub extern "C" fn fs_async_fchown(fd: i32, uid: u32, gid: u32, callback: *const 
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2524,7 +2560,7 @@ pub extern "C" fn fs_async_fdatasync(fd: i32, callback: *const AsyncClosure) {
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2548,7 +2584,7 @@ pub extern "C" fn fs_async_fstat(fd: i32, callback: *const AsyncFileStatClosure)
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(|stat: node_fs::file_stat::FileStat| stat.into()))
@@ -2572,7 +2608,7 @@ pub extern "C" fn fs_async_fsync(fd: i32, callback: *const AsyncClosure) {
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2596,7 +2632,7 @@ pub extern "C" fn fs_async_ftruncate(fd: i32, len: i64, callback: *const AsyncCl
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2619,7 +2655,7 @@ pub extern "C" fn fs_async_futimes(fd: i32, atime: i64, mtime: i64, callback: *c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2645,7 +2681,7 @@ pub extern "C" fn fs_async_lchmod(path: *const c_char, mode: u16, callback: *con
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2672,7 +2708,7 @@ pub extern "C" fn fs_async_lchown(path: *const c_char, uid: u32, gid: u32, callb
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2699,7 +2735,7 @@ pub extern "C" fn fs_async_lutimes(path: *const c_char, atime: i64, mtime: i64, 
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2729,7 +2765,7 @@ pub extern "C" fn fs_async_link(existing_path: *const c_char, new_path: *const c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2756,7 +2792,7 @@ pub extern "C" fn fs_async_lstat(path: *const c_char, callback: *const AsyncFile
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(|stat: node_fs::file_stat::FileStat| stat.into()))
@@ -2784,7 +2820,7 @@ pub extern "C" fn fs_async_mkdir(path: *const c_char, options: MkDirOptions, cal
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -2811,7 +2847,7 @@ pub extern "C" fn fs_async_mkdtemp(prefix: *const c_char, options: MkdTempOption
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(path.map(|path: std::path::PathBuf| path.to_string_lossy().to_string()))
@@ -2834,18 +2870,49 @@ pub extern "C" fn fs_async_open(path: *const c_char, flag: i32, mode: i32, callb
 
     let callback = Arc::clone(&callback.0);
     let cb = Arc::new(
-        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error| {
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error: Option<std::io::Error>| {
             if error.is_some() {
-                callback.on_error(error
+                let error = error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
-                )
+                    .map(NodeError);
+
+                callback.on_error(error)
             } else {
                 callback.on_success(result)
             }
         }))
     );
     node_fs::a_sync::open(path.as_ref(), flag, mode, cb);
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_async_open_handle(path: *const c_char, flag: i32, mode: i32, callback: *const AsyncFileHandleClosure) {
+    if path.is_null() || callback.is_null() {
+        return;
+    }
+
+    let path = unsafe { CStr::from_ptr(path) };
+    let path = path.to_string_lossy();
+
+    let callback = unsafe { &*callback };
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |result, error: Option<std::io::Error>| {
+            if error.is_some() {
+                let error = error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError);
+
+                callback.on_error(error)
+            } else {
+                callback.on_success(result.map(FileHandle))
+            }
+        }))
+    );
+
+    node_fs::file_handle::FileHandle::new_async(path.as_ref(), flag, mode, cb);
 }
 
 #[no_mangle]
@@ -2865,7 +2932,7 @@ pub extern "C" fn fs_async_opendir(path: *const c_char, options: OpenDirOptions,
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(FileDir))
@@ -2898,7 +2965,7 @@ pub extern "C" fn fs_async_read(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result)
@@ -2930,7 +2997,7 @@ pub extern "C" fn fs_async_readdir(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(|result| result.into_iter()
@@ -2960,7 +3027,7 @@ pub extern "C" fn fs_async_read_file(path: *const c_char, options: ReadFileOptio
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(FsEncoding))
@@ -2985,7 +3052,7 @@ pub extern "C" fn fs_async_read_file_with_fd(fd: i32, options: ReadFileOptions, 
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(FsEncoding))
@@ -3013,7 +3080,7 @@ pub extern "C" fn fs_async_read_link(path: *const c_char, options: ReadLinkOptio
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(FsEncoding))
@@ -3046,7 +3113,7 @@ pub extern "C" fn fs_async_readv(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result)
@@ -3076,7 +3143,7 @@ pub extern "C" fn fs_async_real_path(path: *const c_char, options: RealPathOptio
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(|result| result.to_string_lossy().to_string()))
@@ -3107,7 +3174,7 @@ pub extern "C" fn fs_async_rename(old_path: *const c_char, new_path: *const c_ch
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3138,7 +3205,7 @@ pub extern "C" fn fs_async_rmdir(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3168,7 +3235,7 @@ pub extern "C" fn fs_async_rm(
         node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
             if error.is_some() {
                 callback.on_error(error
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3195,7 +3262,7 @@ pub extern "C" fn fs_async_stat(path: *const c_char, throw_if_no_entry: bool, ca
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(|result| result.into()))
@@ -3229,7 +3296,7 @@ pub extern "C" fn fs_async_symlink(target: *const c_char, path: *const c_char, t
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3256,7 +3323,7 @@ pub extern "C" fn fs_async_truncate(path: *const c_char, len: u64, callback: *co
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3283,7 +3350,7 @@ pub extern "C" fn fs_async_unlink(path: *const c_char, callback: *const AsyncClo
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3322,7 +3389,7 @@ pub extern "C" fn fs_async_unwatch_file_with_callback(filename: *const c_char, c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(FileWatchEvent))
@@ -3349,7 +3416,7 @@ pub extern "C" fn fs_async_utimes(path: *const c_char, atime: i64, mtime: i64, c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3376,7 +3443,7 @@ pub extern "C" fn fs_async_file_watcher_unref(filename: *const c_char, callback:
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(FileWatchEvent))
@@ -3403,7 +3470,7 @@ pub extern "C" fn fs_async_file_watcher_ref(filename: *const c_char, callback: *
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(FileWatchEvent))
@@ -3436,7 +3503,7 @@ pub extern "C" fn fs_async_watch(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(WatchEvent))
@@ -3466,7 +3533,7 @@ pub extern "C" fn fs_async_watcher_unref(filename: *const c_char, callback: *con
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(WatchEvent))
@@ -3494,7 +3561,7 @@ pub extern "C" fn fs_async_watcher_ref(filename: *const c_char, callback: *const
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(WatchEvent))
@@ -3527,7 +3594,7 @@ pub extern "C" fn fs_async_watcher_close(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(WatchEvent))
@@ -3542,7 +3609,7 @@ pub extern "C" fn fs_async_watcher_close(
             if error.is_some() {
                 on_close.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 on_close.on_success(None)
@@ -3578,7 +3645,7 @@ pub extern "C" fn fs_async_watch_file(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(event.map(FileWatchEvent))
@@ -3610,7 +3677,7 @@ pub extern "C" fn fs_async_write(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -3644,7 +3711,7 @@ pub extern "C" fn fs_async_write_string(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -3676,7 +3743,7 @@ pub extern "C" fn fs_async_write_file_with_str(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3702,7 +3769,7 @@ pub extern "C" fn fs_async_write_file_with_bytes(fd: i32, data: *const Buffer, o
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3737,7 +3804,7 @@ pub extern "C" fn fs_async_write_file_with_str_from_path(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3774,7 +3841,7 @@ pub extern "C" fn fs_async_write_file_with_bytes_from_path(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3807,7 +3874,7 @@ pub extern "C" fn fs_async_writev(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -3846,12 +3913,11 @@ pub extern "C" fn fs_handle_new_async(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(handle
-                    .map(FileHandle)
-                    .map(|handle| Box::new(handle)))
+                    .map(FileHandle))
             }
         }))
     );
@@ -3885,7 +3951,7 @@ pub extern "C" fn fs_handle_append_file_with_str(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3921,7 +3987,7 @@ pub extern "C" fn fs_handle_append_file_with_bytes(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3950,7 +4016,7 @@ pub extern "C" fn fs_handle_chmod(handle: *mut FileHandle, mode: u16, callback: 
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -3979,7 +4045,7 @@ pub extern "C" fn fs_handle_chown(handle: *mut FileHandle, uid: u32, gid: u32, c
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4009,7 +4075,7 @@ pub extern "C" fn fs_handle_close(handle: *mut FileHandle, callback: *const Asyn
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4047,7 +4113,7 @@ pub extern "C" fn fs_handle_datasync(handle: *mut FileHandle, callback: *const A
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4096,7 +4162,7 @@ pub extern "C" fn fs_handle_read(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(read)
@@ -4106,6 +4172,46 @@ pub extern "C" fn fs_handle_read(
 
     handle.0.read(
         &mut buffer.0, offset, length, position, cb,
+    )
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_handle_read_bytes(
+    handle: *mut FileHandle,
+    buffer: *mut u8,
+    buffer_length: usize,
+    offset: usize,
+    length: usize,
+    position: isize,
+    callback: *const AsyncUsizeClosure,
+) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+    let buffer = unsafe { std::slice::from_raw_parts_mut(buffer, buffer_length) };
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |read, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError)
+                )
+            } else {
+                callback.on_success(read)
+            }
+        }))
+    );
+
+    handle.0.read_bytes(
+        buffer, offset, length, position, cb,
     )
 }
 
@@ -4129,7 +4235,7 @@ pub extern "C" fn fs_handle_read_file(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(result.map(FsEncoding))
@@ -4141,6 +4247,46 @@ pub extern "C" fn fs_handle_read_file(
         options.into(), cb,
     )
 }
+
+
+#[no_mangle]
+pub extern "C" fn fs_handle_readv_slice(handle: *mut FileHandle, buffers: *const *mut u8, buffers_buffers: *const usize, length: usize, position: i64, callback: *const AsyncUsizeClosure) {
+    if handle.is_null() || buffers.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |read, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError)
+                )
+            } else {
+                callback.on_success(read)
+            }
+        }))
+    );
+
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, length) };
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+    let buffers = buffers.iter().zip(buffer_length.iter())
+        .map(|(buffer, len)| {
+            unsafe { node_buffer::Buffer::from_reference(*buffer, *len) }
+        }).collect::<Vec<node_buffer::Buffer>>();
+
+    handle.0.readv(
+        buffers, position.try_into().unwrap(), cb,
+    )
+}
+
 
 #[no_mangle]
 pub extern "C" fn fs_handle_readv(
@@ -4166,7 +4312,7 @@ pub extern "C" fn fs_handle_readv(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(read)
@@ -4198,7 +4344,7 @@ pub extern "C" fn fs_handle_stat(handle: *mut FileHandle, callback: *const Async
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(stat.map(|stat| stat.into()))
@@ -4227,7 +4373,7 @@ pub extern "C" fn fs_handle_sync(handle: *mut FileHandle, callback: *const Async
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4256,7 +4402,7 @@ pub extern "C" fn fs_handle_truncate(handle: *mut FileHandle, len: usize, callba
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4290,7 +4436,7 @@ pub extern "C" fn fs_handle_utimes(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4326,7 +4472,7 @@ pub extern "C" fn fs_handle_write(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -4336,6 +4482,45 @@ pub extern "C" fn fs_handle_write(
 
     handle.0.write(
         &buffer.0, options.into(), cb,
+    )
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_handle_write_bytes(
+    handle: *mut FileHandle,
+    buffer: *const u8,
+    length: usize,
+    options: WriteOptions,
+    callback: *const AsyncUsizeClosure,
+) {
+    if handle.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError)
+                )
+            } else {
+                callback.on_success(wrote)
+            }
+        }))
+    );
+
+    let buffer = unsafe { node_buffer::Buffer::from_reference(buffer as _, length) };
+
+    handle.0.write(
+        &buffer, options.into(), cb,
     )
 }
 
@@ -4364,7 +4549,7 @@ pub extern "C" fn fs_handle_write_string(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -4401,7 +4586,7 @@ pub extern "C" fn fs_handle_write_file_with_str(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4437,7 +4622,7 @@ pub extern "C" fn fs_handle_write_file_with_bytes(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(None)
@@ -4449,6 +4634,45 @@ pub extern "C" fn fs_handle_write_file_with_bytes(
         &data.0, options.into(), cb,
     )
 }
+
+
+#[no_mangle]
+pub extern "C" fn fs_handle_write_file_with_bytes_slice(
+    handle: *mut FileHandle,
+    data: *const u8,
+    length: usize,
+    options: WriteFileOptions,
+    callback: *const AsyncClosure,
+) {
+    if handle.is_null() || data.is_null() || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError)
+                )
+            } else {
+                callback.on_success(None)
+            }
+        }))
+    );
+
+    let buffer = unsafe { node_buffer::Buffer::from_reference(data as _, length) };
+    handle.0.write_file_with_bytes(
+        &buffer, options.into(), cb,
+    )
+}
+
 
 #[no_mangle]
 pub extern "C" fn fs_handle_writev(
@@ -4474,7 +4698,7 @@ pub extern "C" fn fs_handle_writev(
             if error.is_some() {
                 callback.on_error(error
                     .map(node_core::error::error_from_io_error)
-                    .map(Error)
+                    .map(NodeError)
                 )
             } else {
                 callback.on_success(wrote)
@@ -4490,52 +4714,228 @@ pub extern "C" fn fs_handle_writev(
     )
 }
 
+
+#[no_mangle]
+pub extern "C" fn fs_handle_writev_slice(
+    handle: *mut FileHandle,
+    buffers: *const *const u8,
+    buffers_buffers: *const usize,
+    length: usize,
+    position: usize,
+    callback: *const AsyncUsizeClosure,
+) {
+    if handle.is_null() || buffers.is_null() || length == 0 || callback.is_null() {
+        return;
+    }
+
+    let callback = unsafe { &*callback };
+
+    let handle = unsafe { &mut *handle };
+
+
+    let buffer_length = unsafe { std::slice::from_raw_parts(buffers_buffers, length) };
+    let buffers = unsafe { std::slice::from_raw_parts(buffers, length) };
+
+
+    let buffers = buffers.iter().zip(buffer_length.iter())
+        .map(|(buffer, len)| {
+            unsafe { node_buffer::Buffer::from_reference((*buffer) as *mut _, length) }
+        }).collect::<Vec<_>>();
+
+
+    let callback = Arc::clone(&callback.0);
+    let cb = Arc::new(
+        node_fs::a_sync::AsyncClosure::new(Box::new(move |wrote, error| {
+            if error.is_some() {
+                callback.on_error(error
+                    .map(node_core::error::error_from_io_error)
+                    .map(NodeError)
+                )
+            } else {
+                callback.on_success(wrote)
+            }
+        }))
+    );
+
+    handle.0.writev(
+        buffers, position.try_into().unwrap(), cb,
+    )
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct FileWatchEvent(node_fs::a_sync::FileWatchEvent);
+
+
+#[no_mangle]
+pub extern "C" fn fs_filewatch_event_destroy(
+    event: *mut FileWatchEvent,
+) {
+    if event.is_null() {
+        return;
+    }
+
+    let _ = unsafe { Box::from_raw(event) };
+}
+
+#[no_mangle]
+pub extern "C" fn fs_filewatch_event_current(
+    event: *const FileWatchEvent,
+) -> *mut FileStat {
+    if event.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let event = unsafe { &*event };
+    let current = event.0.current();
+    current
+        .map(|stat| {
+            Box::into_raw(
+                Box::new(
+                    FileStat::from(stat)
+                )
+            )
+        })
+        .unwrap_or_else(|| {
+            std::ptr::null_mut()
+        })
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_filewatch_event_previous(
+    event: *const FileWatchEvent,
+) -> *mut FileStat {
+    if event.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let event = unsafe { &*event };
+    let previous = event.0.previous();
+    previous
+        .map(|stat| {
+            Box::into_raw(
+                Box::new(
+                    FileStat::from(stat)
+                )
+            )
+        })
+        .unwrap_or_else(|| {
+            std::ptr::null_mut()
+        })
+}
+
 
 #[derive(Clone, Debug)]
 pub struct WatchEvent(node_fs::a_sync::WatchEvent);
 
+
+#[no_mangle]
+pub extern "C" fn fs_watch_event_destroy(
+    event: *mut WatchEvent,
+) {
+    if event.is_null() {
+        return;
+    }
+
+    let _ = unsafe { Box::from_raw(event) };
+}
+
+#[no_mangle]
+pub extern "C" fn fs_watch_event_event_type(
+    event: *const WatchEvent,
+) -> *const c_char {
+    if event.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let event = unsafe { &*event };
+    let event_type = event.0.event_type();
+    event_type
+        .map(|value| {
+            CString::new(value.to_string()).unwrap().into_raw()
+        })
+        .unwrap_or_else(|| {
+            std::ptr::null_mut()
+        })
+}
+
+
+#[no_mangle]
+pub extern "C" fn fs_watch_event_filename(
+    event: *const WatchEvent,
+) -> *const c_char {
+    if event.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let event = unsafe { &*event };
+    let filename = event.0.filename();
+    filename
+        .map(|value| {
+            CString::new(value.to_string()).unwrap().into_raw()
+        })
+        .unwrap_or_else(|| {
+            std::ptr::null_mut()
+        })
+}
+
 #[derive(Clone)]
 pub struct FileDir(node_fs::file_dir::FileDir);
 
+
+#[no_mangle]
+pub extern "C" fn fs_file_dir_destroy(value: *mut FileDir) {
+    if value.is_null() {
+        return;
+    }
+    let _ = unsafe { Box::from_raw(value) };
+}
+
 pub struct FileHandle(node_fs::file_handle::FileHandle);
 
-#[derive(Clone)]
-pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), Error>>);
+#[no_mangle]
+pub extern "C" fn fs_filehandle_destroy(value: *mut FileHandle) {
+    if value.is_null() {
+        return;
+    }
+    let _ = unsafe { Box::from_raw(value) };
+}
 
 #[derive(Clone)]
-pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, Error>>);
+pub struct AsyncClosure(Arc<node_fs::a_sync::AsyncClosure<(), NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<FileStat, Error>>);
+pub struct AsyncBoolClosure(Arc<node_fs::a_sync::AsyncClosure<bool, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, Error>>);
+pub struct AsyncFileStatClosure(Arc<node_fs::a_sync::AsyncClosure<FileStat, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncUsizeClosure(Arc<node_fs::a_sync::AsyncClosure<usize, Error>>);
+pub struct AsyncStringClosure(Arc<node_fs::a_sync::AsyncClosure<String, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncI32Closure(Arc<node_fs::a_sync::AsyncClosure<i32, Error>>);
+pub struct AsyncUsizeClosure(Arc<node_fs::a_sync::AsyncClosure<usize, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<FileWatchEvent, Error>>);
+pub struct AsyncI32Closure(Arc<node_fs::a_sync::AsyncClosure<i32, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, Error>>);
+pub struct AsyncFileWatchClosure(Arc<node_fs::a_sync::AsyncClosure<FileWatchEvent, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncWatchClosure(Arc<node_fs::a_sync::AsyncClosure<WatchEvent, Error>>);
+pub struct AsyncFsEncodingClosure(Arc<node_fs::a_sync::AsyncClosure<FsEncoding, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncReaddirClosure(Arc<node_fs::a_sync::AsyncClosure<Vec<ReaddirResult>, Error>>);
+pub struct AsyncWatchClosure(Arc<node_fs::a_sync::AsyncClosure<WatchEvent, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, Error>>);
+pub struct AsyncReaddirClosure(Arc<node_fs::a_sync::AsyncClosure<Vec<ReaddirResult>, NodeError>>);
 
 #[derive(Clone)]
-pub struct AsyncFileHandleClosure(Arc<node_fs::a_sync::AsyncClosure<Box<FileHandle>, Error>>);
+pub struct AsyncFileDirClosure(Arc<node_fs::a_sync::AsyncClosure<FileDir, NodeError>>);
+
+#[derive(Clone)]
+pub struct AsyncFileHandleClosure(Arc<node_fs::a_sync::AsyncClosure<FileHandle, NodeError>>);
 
 impl Into<node_fs::sync::AppendFileOptions> for AppendFileOptions {
     fn into(self) -> node_fs::sync::AppendFileOptions {
@@ -4731,19 +5131,19 @@ impl From<node_fs::sync::WriteFileOptions> for WriteFileOptions {
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncClosure {
+pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncClosure {
     Box::into_raw(Box::new(
         AsyncClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |_, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn()>(on_success) };
-                        on_success();
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut c_void)>(on_success) };
+                        on_success(data);
                     }
                 }))
             )
@@ -4752,19 +5152,19 @@ pub extern "C" fn fs_async_create_async_closure(on_success: *mut c_void, on_erro
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncBoolClosure {
+pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncBoolClosure {
     Box::into_raw(Box::new(
         AsyncBoolClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(bool)>(on_success) };
-                        on_success(value.unwrap());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(bool, *mut c_void)>(on_success) };
+                        on_success(value.unwrap(), data);
                     }
                 }))
             )
@@ -4773,19 +5173,19 @@ pub extern "C" fn fs_async_create_async_bool_closure(on_success: *mut c_void, on
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileStatClosure {
+pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncFileStatClosure {
     Box::into_raw(Box::new(
         AsyncFileStatClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileStat)>(on_success) };
-                        on_success(Box::into_raw(Box::new(value.unwrap())));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileStat, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )
@@ -4794,19 +5194,19 @@ pub extern "C" fn fs_async_create_async_file_stat_closure(on_success: *mut c_voi
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncStringClosure {
+pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncStringClosure {
     Box::into_raw(Box::new(
         AsyncStringClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*const c_char)>(on_success) };
-                        on_success(CString::new(value.unwrap()).unwrap().into_raw());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*const c_char, *mut c_void)>(on_success) };
+                        on_success(CString::new(value.unwrap()).unwrap().into_raw(), data);
                     }
                 }))
             )
@@ -4815,19 +5215,19 @@ pub extern "C" fn fs_async_create_async_string_closure(on_success: *mut c_void, 
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncUsizeClosure {
+pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncUsizeClosure {
     Box::into_raw(Box::new(
         AsyncUsizeClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(usize)>(on_success) };
-                        on_success(value.unwrap());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(usize, *mut c_void)>(on_success) };
+                        on_success(value.unwrap(), data);
                     }
                 }))
             )
@@ -4836,19 +5236,19 @@ pub extern "C" fn fs_async_create_async_usize_closure(on_success: *mut c_void, o
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncI32Closure {
+pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncI32Closure {
     Box::into_raw(Box::new(
         AsyncI32Closure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
-                        let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error: fn(*mut NodeError, *mut c_void) = unsafe { std::mem::transmute(on_error) };
+                        let err = Box::into_raw(Box::new(error.unwrap()));
+                        on_error(err, data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(i32)>(on_success) };
-                        on_success(value.unwrap());
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(i32, *mut c_void)>(on_success) };
+                        on_success(value.unwrap(), data);
                     }
                 }))
             )
@@ -4857,19 +5257,19 @@ pub extern "C" fn fs_async_create_async_i32_closure(on_success: *mut c_void, on_
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileWatchClosure {
+pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncFileWatchClosure {
     Box::into_raw(Box::new(
         AsyncFileWatchClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileWatchEvent)>(on_success) };
-                        on_success(Box::into_raw(Box::new(value.unwrap())));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileWatchEvent, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )
@@ -4878,19 +5278,19 @@ pub extern "C" fn fs_async_create_async_file_watch_closure(on_success: *mut c_vo
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFsEncodingClosure {
+pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncFsEncodingClosure {
     Box::into_raw(Box::new(
         AsyncFsEncodingClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FsEncoding)>(on_success) };
-                        on_success(Box::into_raw(Box::new(value.unwrap())));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FsEncoding, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )
@@ -4899,19 +5299,19 @@ pub extern "C" fn fs_async_create_async_fs_encoding_closure(on_success: *mut c_v
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncWatchClosure {
+pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncWatchClosure {
     Box::into_raw(Box::new(
         AsyncWatchClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut WatchEvent)>(on_success) };
-                        on_success(Box::into_raw(Box::new(value.unwrap())));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut WatchEvent, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )
@@ -4920,15 +5320,15 @@ pub extern "C" fn fs_async_create_async_fs_watch_closure(on_success: *mut c_void
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncReaddirClosure {
+pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncReaddirClosure {
     Box::into_raw(Box::new(
         AsyncReaddirClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
 
@@ -4945,10 +5345,10 @@ pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_vo
                         };
 
 
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut ReaddirResultArray)>(on_success) };
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut ReaddirResultArray, *mut c_void)>(on_success) };
                         on_success(Box::into_raw(
                             Box::new(ret)
-                        ));
+                        ), data);
                     }
                 }))
             )
@@ -4957,19 +5357,19 @@ pub extern "C" fn fs_async_create_async_fs_readdir_closure(on_success: *mut c_vo
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileDirClosure {
+pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncFileDirClosure {
     Box::into_raw(Box::new(
         AsyncFileDirClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileDir)>(on_success) };
-                        on_success(Box::into_raw(Box::new(value.unwrap())));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileDir, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )
@@ -4978,19 +5378,19 @@ pub extern "C" fn fs_async_create_async_fs_file_dir_closure(on_success: *mut c_v
 }
 
 #[no_mangle]
-pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void) -> *mut AsyncFileHandleClosure {
+pub extern "C" fn fs_async_create_async_fs_file_handle_closure(on_success: *mut c_void, on_error: *mut c_void, data: *mut c_void) -> *mut AsyncFileHandleClosure {
     Box::into_raw(Box::new(
         AsyncFileHandleClosure(
             Arc::new(
                 node_fs::a_sync::AsyncClosure::new(Box::new(move |value, error| {
                     if error.is_some() {
                         let on_error = on_error as *const ();
-                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut Error)>(on_error) };
-                        on_error(Box::into_raw(Box::new(error.unwrap())));
+                        let on_error = unsafe { std::mem::transmute::<*const (), fn(*mut NodeError, *mut c_void)>(on_error) };
+                        on_error(Box::into_raw(Box::new(error.unwrap())), data);
                     } else {
                         let on_success = on_success as *const ();
-                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileHandle)>(on_success) };
-                        on_success(Box::into_raw(value.unwrap()));
+                        let on_success = unsafe { std::mem::transmute::<*const (), fn(*mut FileHandle, *mut c_void)>(on_success) };
+                        on_success(Box::into_raw(Box::new(value.unwrap())), data);
                     }
                 }))
             )

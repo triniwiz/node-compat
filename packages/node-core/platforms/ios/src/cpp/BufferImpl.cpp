@@ -412,7 +412,6 @@ void BufferImpl::Concat(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 hasError = true;
                 break;
             }
-            auto d = vec.data();
             auto item = itemValue.ToLocalChecked();
             if (item->IsUint8Array()) {
                 auto buffer = item.As<v8::Uint8Array>();
@@ -604,9 +603,14 @@ void BufferImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
         }
 
         auto ret = buffer_to_string(ptr->buffer_, encoding, start, end);
+        if (ret == nullptr) {
+            args.GetReturnValue().SetEmptyString();
+            return;
+        }
         args.GetReturnValue().Set(
                 Helpers::ConvertToV8String(isolate, ret)
         );
+        node_string_destroy((char *) ret);
         return;
     }
     return args.GetReturnValue().SetEmptyString();

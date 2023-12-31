@@ -31,20 +31,20 @@ pub type OnSuccessCallback = extern "C" fn(result: Option<NonNull<c_void>>);
 pub type OnErrorCallback = extern "C" fn(error: Option<NonNull<c_void>>);
 
 pub struct AsyncClosure<T, U> {
-    pub callback: Box<dyn Fn(Option<T>, Option<U>)>,
+    func: Box<dyn Fn(Option<T>, Option<U>)>,
 }
 
 impl<T, U> AsyncClosure<T, U> {
     pub fn new(callback: Box<dyn Fn(Option<T>, Option<U>)>) -> Self {
-        Self { callback }
+        Self { func: callback }
     }
 
     pub fn on_success(&self, result: Option<T>) {
-        (self.callback)(result, None)
+        (self.func)(result, None);
     }
 
     pub fn on_error(&self, result: Option<U>) {
-        (self.callback)(None, result)
+        (self.func)(None, result);
     }
 
     pub fn into_arc(self) -> Arc<Self> {
@@ -75,6 +75,14 @@ impl WatchEvent {
         })
     }
 
+    pub fn filename(&self) -> Option<&str> {
+        self.0.filename.as_deref()
+    }
+
+    pub fn event_type(&self) -> Option<&str> {
+        self.0.event_type.as_deref()
+    }
+
     pub fn into_box(self) -> Box<WatchEvent> {
         Box::new(self)
     }
@@ -96,6 +104,14 @@ impl FileWatchEvent {
             current: Some(current),
             previous: Some(previous),
         })
+    }
+
+    pub fn current(&self) -> Option<FileStat> {
+        self.0.current
+    }
+
+    pub fn previous(&self) -> Option<FileStat> {
+        self.0.previous
     }
 
     pub fn into_box(self) -> Box<FileWatchEvent> {
@@ -541,6 +557,29 @@ pub fn read(
     });
 }
 
+
+pub fn read_bytes(
+    fd: c_int,
+    buffer: &mut [u8],
+    offset: usize,
+    length: usize,
+    position: isize,
+    callback: Arc<AsyncClosure<usize, Error>>,
+) {
+    // only wrapping to make em happy
+    let mut buf = unsafe { Buffer::from_reference(buffer.as_mut_ptr(), buffer.len()) };
+    let _ = node_core::thread::spawn(move || {
+        match super::sync::read(fd, buf.buffer_mut(), offset, length, position) {
+            Ok(read) => {
+                callback.on_success(Some(read));
+            }
+            Err(error) => {
+                callback.on_error(Some(error));
+            }
+        }
+    });
+}
+
 pub fn readdir(
     path: &str,
     options: ReaddirOptions,
@@ -619,6 +658,26 @@ pub fn readv(
         }
     });
 }
+
+pub fn readv_slice(
+    fd: c_int,
+    buffers: Vec<Buffer>,
+    position: c_long,
+    callback: Arc<AsyncClosure<usize, Error>>,
+) {
+    let _ = node_core::thread::spawn(move || {
+        let mut buffers = buffers;
+        match super::sync::readv(fd, buffers.as_mut_slice(), position) {
+            Ok(read) => {
+                callback.on_success(Some(read));
+            }
+            Err(error) => {
+                callback.on_error(Some(error));
+            }
+        }
+    });
+}
+
 
 pub fn readv_raw(
     fd: c_int,

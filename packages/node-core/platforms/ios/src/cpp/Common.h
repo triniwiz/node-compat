@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-#include "nodenative/include/node_c.h"
+#include "node_c.h"
 
 #ifdef __cplusplus
 }

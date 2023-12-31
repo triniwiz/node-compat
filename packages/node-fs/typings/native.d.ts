@@ -14,6 +14,8 @@ declare interface Dir {}
 
 declare interface Stats {}
 
+declare class NSCFileHandle {}
+
 declare class NSCFS {
   static accessSync(path: string | NSCBuffer | URL, mode: number);
   static appendFileSync(
@@ -79,6 +81,8 @@ declare class NSCFS {
 
   static open(path: string | NSCBuffer | URL, flags: string | number, mode: string | number, callback: (error: Error, fd: number) => void);
 
+  static openHandle(path: string | NSCBuffer | URL, flags: string | number, mode: string | number, callback: (error: Error, handle: NSCFileHandle) => void);
+
   static readdirSync(
     path: string | NSCBuffer | URL,
     options?: {
@@ -98,7 +102,7 @@ declare class NSCFS {
 
   static readlinkSync(path: string | NSCBuffer | URL, options?: { encoding?: string }): string | NSCBuffer;
 
-  static readSync(fd: number, buffer: NSCBuffer | TypedArray | DataView, offset?: number, length?: number, position?: number | BigInt): number;
+  static readSync(fd: number, buffer: NSCBuffer | TypedArray | DataView, offset?: number, length?: number, position?: number | bigint): number;
 
   static readvSync(fd: number, buffers: ArrayBufferView[], position?: number): number;
 

@@ -3,11 +3,426 @@
 //
 
 #include "Helpers.h"
+#include "BufferImpl.h"
+#include "FileDirentImpl.h"
+#include "FileDirImpl.h"
+#include "FileHandleImpl.h"
 
 const char *Helpers::LOG_TAG = "JS";
 int Helpers::m_maxLogcatObjectSize = 4096;
 
+
+extern "C" {
+void async_success_closure(void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), v8::Null(isolate)};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_i32(int32_t fd, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), v8::Integer::New(isolate, fd)};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_bool(bool value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), v8::Boolean::New(isolate, value)};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_filestat(FileStat *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            auto val = Helpers::FileStatToJS(isolate, false, *value);
+
+            filestat_destroy(value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_string(const char *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+            auto val = Helpers::ConvertToV8String(isolate, value);
+            node_string_destroy((char *) value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_usize(uintptr_t value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), v8::Number::New(isolate, value)};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_filewatch_event(FileWatchEvent *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            auto val = v8::Object::New(isolate);
+            auto current = fs_filewatch_event_current(value);
+            auto previous = fs_filewatch_event_previous(value);
+            auto currentJS = Helpers::FileStatToJS(isolate, false, *current);
+            auto previousJS = Helpers::FileStatToJS(isolate, false, *previous);
+            val->Set(context, Helpers::ConvertToV8String(isolate, "current"), currentJS);
+            val->Set(context, Helpers::ConvertToV8String(isolate, "previous"), previousJS);
+            fs_filewatch_event_destroy(value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_watch_event(WatchEvent *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            auto val = v8::Object::New(isolate);
+            auto event_type = fs_watch_event_event_type(value);
+            auto filename = fs_watch_event_filename(value);
+            auto event_typeJS = Helpers::ConvertToV8String(isolate, event_type);
+            auto filenameJS = Helpers::ConvertToV8String(isolate, filename);
+            val->Set(context, Helpers::ConvertToV8String(isolate, "eventType"), event_typeJS);
+            val->Set(context, Helpers::ConvertToV8String(isolate, "filename"), filenameJS);
+            fs_watch_event_destroy(value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_fs_encoding(FsEncoding *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            v8::Local<v8::Value> ret;
+            if (fs_encoding_is_buffer(value)) {
+                auto buf = fs_encoding_get_buffer_value(value);
+                auto bufferImpl = new BufferImpl(buf);
+
+                auto ext = v8::External::New(isolate, bufferImpl);
+
+                auto ctor = BufferImpl::GetCtor(isolate);
+                auto val = ctor->GetFunction(context).ToLocalChecked()->NewInstance(
+                        context).ToLocalChecked();
+                val->SetInternalField(0, ext);
+                ret = val;
+
+            } else {
+                auto string = fs_encoding_get_string_value(value);
+                ret = Helpers::ConvertToV8String(isolate, string);
+                node_string_destroy((char *) string);
+            }
+
+            fs_encoding_destroy(value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), ret};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_readdir(ReaddirResultArray *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+            auto len = value->length;
+            auto size = sizeof(value->data);
+            auto array = v8::Array::New(isolate, len);
+            for (int i = 0; i < len; i++) {
+                auto item = (&value->data)[size * i];
+                switch (fs_readdir_get_type(item)) {
+                    case ReaddirResultTypeString:
+                        array->Set(context, i, Helpers::ConvertToV8String(isolate,
+                                                                          fs_readdir_get_string_value(
+                                                                                  item)));
+                        break;
+                    case ReaddirResultTypeBuffer: {
+                        auto buf = fs_readdir_get_buffer_value(item);
+                        auto bufferImpl = new BufferImpl(buf);
+
+                        auto ext = v8::External::New(isolate, bufferImpl);
+
+                        auto ctor = BufferImpl::GetCtor(isolate);
+                        auto val = ctor->GetFunction(context).ToLocalChecked()->NewInstance(
+                                context).ToLocalChecked();
+                        val->SetInternalField(0, ext);
+
+                        array->Set(context, i, val);
+                    }
+                        break;
+                    case ReaddirResultTypeType: {
+                        auto dirent = fs_readdir_get_type_value(item);
+                        auto direntImpl = new FileDirentImpl(dirent);
+
+                        auto ext = v8::External::New(isolate, direntImpl);
+
+                        auto ctor = FileDirentImpl::GetCtor(isolate);
+                        auto val = ctor->GetFunction(context).ToLocalChecked()->NewInstance(
+                                context).ToLocalChecked();
+
+                        val->SetInternalField(0, ext);
+
+                        array->Set(context, i, val);
+                    }
+                        break;
+                }
+            }
+            fs_readdir_result_array_destroy(value);
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), array};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_filedir(FileDir *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+
+            auto fileDirImpl = new FileDirImpl(value);
+
+            auto ext = v8::External::New(isolate, fileDirImpl);
+
+            auto ctor = FileDirImpl::GetCtor(isolate);
+            auto val = ctor->GetFunction(context).ToLocalChecked()->NewInstance(
+                    context).ToLocalChecked();
+
+            val->SetInternalField(0, ext);
+
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+void async_success_filehandle(FileHandle *value, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+
+            auto fileHandleImpl = new FileHandleImpl(value);
+
+            auto ext = v8::External::New(isolate, fileHandleImpl);
+
+            auto ctor = FileHandleImpl::GetCtor(isolate);
+            auto val = ctor->GetFunction(context).ToLocalChecked()->NewInstance(
+                    context).ToLocalChecked();
+
+            val->SetInternalField(0, ext);
+
+
+            v8::Local<v8::Value> args[2] = {v8::Null(isolate), val};
+
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+}
+
+
+void async_error(NodeError *error, void *data) {
+    if (data != nullptr) {
+        auto func = static_cast<AsyncCallback *>(data);
+        if (func->isolate != nullptr && !func->isolate->IsDead()) {
+            v8::Isolate *isolate = func->isolate;
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Function> callback = func->callback.Get(isolate);
+            v8::Local<v8::Context> context = callback->GetCreationContextChecked();
+            v8::Context::Scope context_scope(context);
+
+            auto message = node_error_get_message(error);
+            auto jsMessage = Helpers::ConvertToV8String(isolate, message);
+            auto jsError = v8::Exception::Error(jsMessage);
+            v8::Local<v8::Value> args[2] = {jsError, v8::Null(isolate)};
+
+            callback->Call(context, context->Global(), 2,
+                           args);  // ignore JS return value
+
+            delete func;
+        }
+    }
+    if (error != nullptr) {
+        node_error_destroy(error);
+    }
+}
+}
+
+
 #ifdef __ANDROID__
+
 void Helpers::sendToADBLogcat(const std::string &message, android_LogPriority logPriority) {
     // limit the size of the message that we send to logcat using the predefined value in package.json
     auto messageToLog = message;
@@ -31,6 +446,7 @@ void Helpers::sendToADBLogcat(const std::string &message, android_LogPriority lo
         }
     }
 }
+
 #endif
 
 
